@@ -1,0 +1,173 @@
+import { useMemo, useCallback, useState, useEffect } from 'react';
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
+  type Node,
+  type Edge,
+} from '@xyflow/react';
+import '@xyflow/react/dist/style.css';
+import { useStore } from '../store/useStore';
+import { flattenToDAG, layoutDAG, FlatDAG } from '../core/GraphFlattener';
+import { BlueprintNode, type BlueprintNodeData } from './blueprint/BlueprintNode';
+import { BlueprintEdge, type BlueprintEdgeData } from './blueprint/BlueprintEdge';
+import { classifyBeltStatus, getBeltsNeeded } from '../data/belts';
+
+const nodeTypes = { blueprint: BlueprintNode };
+const edgeTypes = { belt: BlueprintEdge };
+
+function buildReactFlowData(
+  dag: FlatDAG,
+  positions: Map<string, { x: number; y: number }>,
+  beltSpeed: number,
+  isDark: boolean,
+  rootItemId: string,
+): { rfNodes: Node[]; rfEdges: Edge[] } {
+  // Build a map of which items are inputs to which nodes (for handle placement)
+  const inputsOf = new Map<string, string[]>();
+  for (const edge of dag.edges) {
+    const existing = inputsOf.get(edge.toItemId) ?? [];
+    existing.push(edge.fromItemId);
+    inputsOf.set(edge.toItemId, existing);
+  }
+
+  // Find max edge rate for relative width scaling
+  const maxRate = dag.edges.reduce(
+    (max, e) => Math.max(max, e.rate.toNumber()),
+    1,
+  );
+
+  const rfNodes: Node[] = dag.nodes.map((flatNode) => {
+    const pos = positions.get(flatNode.itemId) ?? { x: 0, y: 0 };
+    const nodeInputs = inputsOf.get(flatNode.itemId) ?? [];
+
+    return {
+      id: flatNode.itemId,
+      type: 'blueprint',
+      position: pos,
+      data: {
+        flatNode,
+        inputItemIds: nodeInputs,
+        isDark,
+        isRoot: flatNode.itemId === rootItemId,
+      } satisfies BlueprintNodeData,
+    };
+  });
+
+  const rfEdges: Edge[] = dag.edges.map((flatEdge) => {
+    const rate = flatEdge.rate.toNumber();
+    const beltStatus = classifyBeltStatus(rate, beltSpeed);
+    const beltsNeeded = getBeltsNeeded(rate, beltSpeed);
+
+    return {
+      id: `${flatEdge.fromItemId}->${flatEdge.toItemId}`,
+      source: flatEdge.fromItemId,
+      target: flatEdge.toItemId,
+      sourceHandle: flatEdge.fromItemId,
+      targetHandle: flatEdge.fromItemId,
+      type: 'belt',
+      data: {
+        flatEdge,
+        beltStatus,
+        beltsNeeded,
+        maxRate,
+        isDark,
+      } satisfies BlueprintEdgeData,
+    };
+  });
+
+  return { rfNodes, rfEdges };
+}
+
+export function BlueprintFlowView() {
+  const productionResult = useStore((s) => s.productionResult);
+  const beltSpeed = useStore((s) => s.beltSpeed);
+  const theme = useStore((s) => s.theme);
+  const targetItemId = useStore((s) => s.targetItemId);
+  const isDark = theme === 'dark';
+
+  const [isSmallScreen, setIsSmallScreen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    setIsSmallScreen(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsSmallScreen(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  const { initialNodes, initialEdges } = useMemo(() => {
+    if (!productionResult) {
+      return { initialNodes: [] as Node[], initialEdges: [] as Edge[] };
+    }
+    const dag = flattenToDAG(productionResult);
+    const positions = layoutDAG(dag);
+    const { rfNodes, rfEdges } = buildReactFlowData(
+      dag,
+      positions,
+      beltSpeed,
+      isDark,
+      targetItemId,
+    );
+    return { initialNodes: rfNodes, initialEdges: rfEdges };
+  }, [productionResult, beltSpeed, isDark, targetItemId]);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Sync when production result changes
+  useMemo(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
+
+  const minimapNodeColor = useCallback(
+    () => (isDark ? '#6B7280' : '#9CA3AF'),
+    [isDark],
+  );
+
+  if (!productionResult) {
+    return (
+      <div
+        className={`h-[60vh] sm:h-[500px] ${isDark ? 'bg-gray-800' : 'bg-gray-100'} rounded-lg flex items-center justify-center`}
+      >
+        <span className={`${isDark ? 'text-gray-500' : 'text-gray-400'} italic`}>
+          Select an item to see production blueprint
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`h-[60vh] sm:h-[500px] ${isDark ? 'bg-gray-900' : 'bg-gray-50'} rounded-lg overflow-hidden`}
+    >
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.2 }}
+        minZoom={0.1}
+        maxZoom={2}
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background color={isDark ? '#374151' : '#D1D5DB'} gap={20} />
+        <Controls
+          className={isDark ? 'bg-gray-800 rounded' : 'bg-white rounded'}
+        />
+        {!isSmallScreen && (
+          <MiniMap
+            className={isDark ? 'bg-gray-800 rounded' : 'bg-gray-100 rounded'}
+            nodeColor={minimapNodeColor}
+          />
+        )}
+      </ReactFlow>
+    </div>
+  );
+}
