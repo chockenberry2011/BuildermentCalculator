@@ -14,7 +14,8 @@ import { useStore } from '../store/useStore';
 import { flattenToDAG, layoutDAG, FlatDAG } from '../core/GraphFlattener';
 import { BlueprintNode, type BlueprintNodeData } from './blueprint/BlueprintNode';
 import { BlueprintEdge, type BlueprintEdgeData } from './blueprint/BlueprintEdge';
-import { classifyBeltStatus, getBeltsNeeded } from '../data/belts';
+import { getItemColor } from '../data/itemColors';
+import { classifyBeltStatus, getBeltsNeeded, getBeltUtilization } from '../data/belts';
 
 const nodeTypes = { blueprint: BlueprintNode };
 const edgeTypes = { belt: BlueprintEdge };
@@ -25,6 +26,7 @@ function buildReactFlowData(
   beltSpeed: number,
   isDark: boolean,
   rootItemId: string,
+  rootItemIds?: Set<string>,
 ): { rfNodes: Node[]; rfEdges: Edge[] } {
   // Build a map of which items are inputs to which nodes (for handle placement)
   const inputsOf = new Map<string, string[]>();
@@ -52,7 +54,7 @@ function buildReactFlowData(
         flatNode,
         inputItemIds: nodeInputs,
         isDark,
-        isRoot: flatNode.itemId === rootItemId,
+        isRoot: rootItemIds ? rootItemIds.has(flatNode.itemId) : flatNode.itemId === rootItemId,
       } satisfies BlueprintNodeData,
     };
   });
@@ -61,6 +63,7 @@ function buildReactFlowData(
     const rate = flatEdge.rate.toNumber();
     const beltStatus = classifyBeltStatus(rate, beltSpeed);
     const beltsNeeded = getBeltsNeeded(rate, beltSpeed);
+    const utilization = getBeltUtilization(rate, beltSpeed);
 
     return {
       id: `${flatEdge.fromItemId}->${flatEdge.toItemId}`,
@@ -73,6 +76,7 @@ function buildReactFlowData(
         flatEdge,
         beltStatus,
         beltsNeeded,
+        utilization,
         maxRate,
         isDark,
       } satisfies BlueprintEdgeData,
@@ -98,11 +102,22 @@ export function BlueprintFlowView() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
+  const targets = useStore((s) => s.targets);
+
+  const rootItemIds = useMemo(() => {
+    if (targets.length > 1) {
+      return new Set(targets.map((t) => t.itemId));
+    }
+    return new Set([targetItemId]);
+  }, [targets, targetItemId]);
+
   const { initialNodes, initialEdges } = useMemo(() => {
     if (!productionResult) {
       return { initialNodes: [] as Node[], initialEdges: [] as Edge[] };
     }
     const dag = flattenToDAG(productionResult);
+    // Filter out the synthetic __multi_root__ node
+    dag.nodes = dag.nodes.filter((n) => n.itemId !== '__multi_root__');
     const positions = layoutDAG(dag);
     const { rfNodes, rfEdges } = buildReactFlowData(
       dag,
@@ -110,9 +125,10 @@ export function BlueprintFlowView() {
       beltSpeed,
       isDark,
       targetItemId,
+      rootItemIds,
     );
     return { initialNodes: rfNodes, initialEdges: rfEdges };
-  }, [productionResult, beltSpeed, isDark, targetItemId]);
+  }, [productionResult, beltSpeed, isDark, targetItemId, rootItemIds]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -124,14 +140,17 @@ export function BlueprintFlowView() {
   }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   const minimapNodeColor = useCallback(
-    () => (isDark ? '#6B7280' : '#9CA3AF'),
-    [isDark],
+    (node: Node) => {
+      const data = node.data as BlueprintNodeData | undefined;
+      return data?.flatNode ? getItemColor(data.flatNode.itemId) : '#6B7280';
+    },
+    [],
   );
 
   if (!productionResult) {
     return (
       <div
-        className={`h-[60vh] sm:h-[500px] ${isDark ? 'bg-gray-800' : 'bg-gray-100'} rounded-lg flex items-center justify-center`}
+        className={`h-[60vh] ${isDark ? 'bg-gray-800' : 'bg-gray-100'} rounded-lg flex items-center justify-center`}
       >
         <span className={`${isDark ? 'text-gray-500' : 'text-gray-400'} italic`}>
           Select an item to see production blueprint
@@ -140,9 +159,13 @@ export function BlueprintFlowView() {
     );
   }
 
+  // Estimate height from DAG depth: base 300px + 120px per layer, min 400px
+  const estimatedHeight = Math.max(400, 300 + initialNodes.length * 40);
+
   return (
     <div
-      className={`h-[60vh] sm:h-[500px] ${isDark ? 'bg-gray-900' : 'bg-gray-50'} rounded-lg overflow-hidden`}
+      className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} rounded-lg overflow-hidden`}
+      style={{ height: `${estimatedHeight}px` }}
     >
       <ReactFlow
         nodes={nodes}

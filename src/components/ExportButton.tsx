@@ -14,7 +14,7 @@ export function ExportButton() {
 
     const item = ITEMS[targetItemId];
 
-    let text = `Builderment Production Plan\n`;
+    let text = `Builderment Resource Calculator - Production Plan\n`;
     text += `========================\n\n`;
     text += `Target: ${item?.name ?? targetItemId} @ ${targetRate}/min\n`;
     text += `\n`;

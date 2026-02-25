@@ -1,8 +1,12 @@
 import { ProductionNode } from '../core/ProductionCalculator';
 import { BUILDINGS } from '../data/buildings';
+import { getItemColor } from '../data/itemColors';
 import { useStore } from '../store/useStore';
-import { Rational } from '../core/math/rational';
-import { BeltCalculationResult, formatBeltRequirement } from '../core/BeltCalculator';
+import { BeltCalculationResult } from '../core/BeltCalculator';
+import { BuildingIcon } from './BuildingIcon';
+import { BeltIcon } from './BeltIcon';
+import { EditableBuildingCount } from './EditableBuildingCount';
+import { SplitBadge } from './SplitBadge';
 
 interface TreeNodeProps {
   node: ProductionNode;
@@ -10,20 +14,11 @@ interface TreeNodeProps {
   isDark: boolean;
   showBeltInfo: boolean;
   beltResult: BeltCalculationResult | null;
+  setRateFromItemBuildingCount: (itemId: string, count: number) => void;
+  constraintSource: { type: string; itemId?: string };
 }
 
-function formatCount(count: Rational): { text: string; isInteger: boolean } {
-  const value = count.toNumber();
-  const isInteger = count.isInteger() || Math.abs(value - Math.round(value)) < 0.001;
-
-  if (isInteger) {
-    return { text: Math.round(value).toString(), isInteger: true };
-  }
-
-  return { text: value.toFixed(2), isInteger: false };
-}
-
-function TreeNode({ node, depth, isDark, showBeltInfo, beltResult }: TreeNodeProps) {
+function TreeNode({ node, depth, isDark, showBeltInfo, beltResult, setRateFromItemBuildingCount, constraintSource }: TreeNodeProps) {
   const indent = depth * 16;
 
   const buildingInfo = node.building;
@@ -31,8 +26,8 @@ function TreeNode({ node, depth, isDark, showBeltInfo, beltResult }: TreeNodePro
     ? BUILDINGS[buildingInfo.buildingType]?.name ?? buildingInfo.buildingType
     : '';
 
-  const count = buildingInfo ? formatCount(buildingInfo.count) : null;
   const rate = node.ratePerMinute.toNumber();
+  const isConstraint = constraintSource.type === 'itemBuilding' && constraintSource.itemId === node.itemId;
 
   // Find belt connection for this node (from this item to its parent)
   const beltConnection = showBeltInfo && beltResult
@@ -42,39 +37,42 @@ function TreeNode({ node, depth, isDark, showBeltInfo, beltResult }: TreeNodePro
   return (
     <div className="font-mono text-xs sm:text-sm">
       <div
-        className={`flex items-center gap-2 py-1 rounded px-2 ${
+        className={`flex items-center py-1 rounded px-2 ${
           isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-100'
         }`}
         style={{ paddingLeft: `${indent + 8}px` }}
       >
-        {/* Connector line */}
-        {depth > 0 && (
-          <span className={isDark ? 'text-gray-600 mr-1' : 'text-gray-400 mr-1'}>
-            {depth === 1 ? '├──' : '└──'}
-          </span>
-        )}
-
-        {/* Item name and rate */}
-        <span className={`font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
-          {node.itemName}
-        </span>
-        <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
-          ({rate.toFixed(2)}/min)
-        </span>
-
-        {/* Building info */}
-        {buildingInfo && count && (
-          <>
-            <span className={isDark ? 'text-gray-500' : 'text-gray-400'}>-</span>
-            <span
-              className={`font-semibold ${
-                count.isInteger
-                  ? 'text-green-600 dark:text-green-400'
-                  : 'text-yellow-600 dark:text-yellow-400'
-              }`}
-            >
-              {count.text}
+        {/* Left side: connector + name + rate + dashed fill — fixed width so inputs align */}
+        <div className="flex items-center gap-2 w-[220px] sm:w-[280px] flex-shrink-0">
+          {depth > 0 && (
+            <span className={isDark ? 'text-gray-600' : 'text-gray-400'}>
+              {depth === 1 ? '├──' : '└──'}
             </span>
+          )}
+          <span className="font-medium truncate" style={{ color: getItemColor(node.itemId) }}>
+            {node.itemName}
+          </span>
+          <span className={`flex-shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+            {rate.toFixed(2)}/min
+          </span>
+          {buildingInfo && (
+            <div
+              className="flex-1 min-w-[8px] border-b-2 border-dashed self-center"
+              style={{ height: '0.5em', borderColor: getItemColor(node.itemId) + '90' }}
+            />
+          )}
+        </div>
+
+        {/* Right side: building info — aligned across siblings */}
+        {buildingInfo && (
+          <div className="flex items-center gap-1.5 ml-2">
+            <EditableBuildingCount
+              count={buildingInfo.count}
+              isConstraint={isConstraint}
+              onSetCount={(newCount) => setRateFromItemBuildingCount(node.itemId, newCount)}
+              isDark={isDark}
+            />
+            <BuildingIcon buildingType={buildingInfo.buildingType} />
             <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
               {buildingName}
               {buildingInfo.level > 1 && (
@@ -83,29 +81,31 @@ function TreeNode({ node, depth, isDark, showBeltInfo, beltResult }: TreeNodePro
                 </span>
               )}
             </span>
-            {count.isInteger && (
-              <span
-                className="text-xs px-1 py-0.5 rounded bg-green-800 text-green-300"
-                title="Exact building count - no fractions needed"
-              >
-                INT
-              </span>
-            )}
-          </>
+          </div>
         )}
 
         {/* Belt info — only show for bottleneck or near-capacity */}
         {beltConnection && beltConnection.status !== 'ok' && (
           <span
-            className={`text-xs px-1.5 py-0.5 rounded ${
+            className={`inline-flex items-center gap-0.5 whitespace-nowrap flex-shrink-0 text-xs px-1.5 py-0.5 rounded ml-1.5 ${
               beltConnection.status === 'multi-belt'
                 ? 'bg-blue-900 text-blue-300'
                 : 'bg-yellow-900 text-yellow-300'
             }`}
             title={`${beltConnection.throughputPerMinute.toNumber().toFixed(1)}/min throughput, ${Math.round(beltConnection.utilization * 100)}% belt utilization`}
           >
-            ← {formatBeltRequirement(beltConnection)}
+            <BeltIcon
+              size={12}
+              color={beltConnection.status === 'multi-belt' ? '#93C5FD' : '#FDE68A'}
+            />
+            {beltConnection.status === 'multi-belt'
+              ? `\u00D7${beltConnection.beltsNeeded}`
+              : `${Math.round(beltConnection.utilization * 100)}%`}
           </span>
+        )}
+
+        {buildingInfo && !buildingInfo.count.isInteger() && (
+          <SplitBadge count={buildingInfo.count} />
         )}
       </div>
 
@@ -118,6 +118,8 @@ function TreeNode({ node, depth, isDark, showBeltInfo, beltResult }: TreeNodePro
           isDark={isDark}
           showBeltInfo={showBeltInfo}
           beltResult={beltResult}
+          setRateFromItemBuildingCount={setRateFromItemBuildingCount}
+          constraintSource={constraintSource}
         />
       ))}
     </div>
@@ -130,6 +132,8 @@ export function ProductionTree() {
   const showBeltInfo = useStore((s) => s.showBeltInfo);
   const targetRate = useStore((s) => s.targetRate);
   const theme = useStore((s) => s.theme);
+  const setRateFromItemBuildingCount = useStore((s) => s.setRateFromItemBuildingCount);
+  const constraintSource = useStore((s) => s.constraintSource);
   const isDark = theme === 'dark';
 
   if (!productionResult) {
@@ -140,25 +144,55 @@ export function ProductionTree() {
     );
   }
 
+  const isMultiRoot = productionResult.root.itemId === '__multi_root__';
+
   return (
-    <div className={`rounded-lg p-3 sm:p-4 overflow-auto max-h-[60vh] sm:max-h-[500px] ${
-      isDark ? 'bg-gray-800' : 'bg-white border border-gray-200'
-    }`}>
-      <div className={`mb-3 pb-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-        <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-          {productionResult.root.itemName}
-        </span>
-        <span className={`ml-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-          @ {targetRate.toFixed(2)}/min
-        </span>
-      </div>
-      <TreeNode
-        node={productionResult.root}
-        depth={0}
-        isDark={isDark}
-        showBeltInfo={showBeltInfo}
-        beltResult={beltResult}
-      />
+    <div>
+      {isMultiRoot ? (
+        // Multi-target: render each child as a separate section
+        productionResult.root.children.map((child, i) => (
+          <div key={`${child.itemId}-${i}`}>
+            <div className={`mb-3 pb-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'} ${i > 0 ? 'mt-4' : ''}`}>
+              <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                {child.itemName}
+              </span>
+              <span className={`ml-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                @ {child.ratePerMinute.toNumber().toFixed(2)}/min
+              </span>
+            </div>
+            <TreeNode
+              node={child}
+              depth={0}
+              isDark={isDark}
+              showBeltInfo={showBeltInfo}
+              beltResult={beltResult}
+              setRateFromItemBuildingCount={setRateFromItemBuildingCount}
+              constraintSource={constraintSource}
+            />
+          </div>
+        ))
+      ) : (
+        // Single target: original behavior
+        <>
+          <div className={`mb-3 pb-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+              {productionResult.root.itemName}
+            </span>
+            <span className={`ml-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+              @ {targetRate.toFixed(2)}/min
+            </span>
+          </div>
+          <TreeNode
+            node={productionResult.root}
+            depth={0}
+            isDark={isDark}
+            showBeltInfo={showBeltInfo}
+            beltResult={beltResult}
+            setRateFromItemBuildingCount={setRateFromItemBuildingCount}
+            constraintSource={constraintSource}
+          />
+        </>
+      )}
     </div>
   );
 }

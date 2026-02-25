@@ -19,8 +19,6 @@ export function ResourceInput() {
   const constraintSource = useStore((s) => s.constraintSource);
   const recipeSelections = useStore((s) => s.recipeSelections);
   const buildingLevels = useStore((s) => s.buildingLevels);
-  const extractorBudget = useStore((s) => s.extractorBudget);
-  const setExtractorBudget = useStore((s) => s.setExtractorBudget);
   const theme = useStore((s) => s.theme);
   const isDark = theme === 'dark';
 
@@ -74,45 +72,6 @@ export function ResourceInput() {
 
   return (
     <div className="space-y-2 sm:space-y-4">
-      {/* Total Extractor Budget */}
-      <div className={`p-2 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
-        <div className="flex items-center gap-2">
-          <label className={`flex-1 text-sm font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-            Total Extractor Budget
-          </label>
-          <input
-            type="number"
-            min={1}
-            value={extractorBudget ?? ''}
-            placeholder="No limit"
-            onChange={(e) => {
-              const val = e.target.value;
-              setExtractorBudget(val === '' ? null : Math.max(1, parseInt(val) || 1));
-            }}
-            className={`w-24 px-2 py-1 rounded text-center ${
-              isDark
-                ? 'bg-gray-600 border-gray-500 text-white placeholder-gray-400'
-                : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400'
-            } border`}
-          />
-          {extractorBudget != null && (
-            <button
-              onClick={() => setExtractorBudget(null)}
-              className={`px-2 py-1 rounded text-xs ${
-                isDark
-                  ? 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-                  : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-              }`}
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        <div className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-          Set a total extractor limit to find practical rates
-        </div>
-      </div>
-
       {/* Current constraints */}
       <div className="space-y-2">
         {resourceConstraints.map((constraint) => {

@@ -1,8 +1,13 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { FlatNode } from '../../core/GraphFlattener';
-import { BUILDINGS, BuildingType } from '../../data/buildings';
+import { BUILDINGS } from '../../data/buildings';
 import { Rational } from '../../core/math/rational';
+import { BuildingIcon } from '../BuildingIcon';
+import { getItemColor } from '../../data/itemColors';
+import { fractionSimplicityScore } from '../../core/RatioOptimizer';
+import { getCountColor } from '../../core/countColor';
+import { SplitBadge } from '../SplitBadge';
 
 export interface BlueprintNodeData {
   flatNode: FlatNode;
@@ -11,17 +16,6 @@ export interface BlueprintNodeData {
   isRoot: boolean;
   [key: string]: unknown;
 }
-
-const BUILDING_COLORS: Record<BuildingType, string> = {
-  extractor: '#3B82F6',        // blue
-  workshop: '#6B7280',         // gray
-  furnace: '#F97316',          // orange
-  machine_shop: '#64748B',     // slate
-  industrial_factory: '#A855F7', // purple
-  manufacturer: '#6366F1',     // indigo
-  forge: '#EF4444',            // red
-  earth_teleporter: '#14B8A6', // teal
-};
 
 function formatCount(count: Rational): { text: string; isInteger: boolean } {
   const value = count.toNumber();
@@ -44,7 +38,7 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
   const { flatNode, inputItemIds, isDark, isRoot } = data as BlueprintNodeData;
   const building = flatNode.building;
   const buildingType = building?.buildingType ?? 'workshop';
-  const accentColor = BUILDING_COLORS[buildingType] ?? '#6B7280';
+  const accentColor = getItemColor(flatNode.itemId);
   const buildingName = building ? (BUILDINGS[building.buildingType]?.name ?? '') : '';
   const count = building ? formatCount(building.count) : null;
 
@@ -77,11 +71,11 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
         {/* Building info */}
         {count && (
           <div className={`mt-1.5 pt-1 flex items-center gap-1.5 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            <BuildingIcon buildingType={buildingType} size="md" />
             <span
-              className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: accentColor }}
-            />
-            <span className={`text-sm font-semibold ${count.isInteger ? 'text-green-400' : 'text-yellow-400'}`}>
+              className="text-sm font-semibold"
+              style={{ color: getCountColor(fractionSimplicityScore(building!.count), isDark) }}
+            >
               {count.text}x
             </span>
             <span className={`text-xs ${subtextColor}`}>
@@ -89,6 +83,9 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
               {building && building.level > 1 ? ` Lv${building.level}` : ''}
             </span>
           </div>
+        )}
+        {count && !count.isInteger && (
+          <SplitBadge count={building!.count} variant="line" />
         )}
       </div>
 

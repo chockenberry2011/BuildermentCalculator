@@ -1,5 +1,5 @@
 import { Recipe, getDefaultRecipe, getRecipesForItem } from '../data/recipes';
-import { BuildingType, getBuildingMultiplier, EXTRACTOR_RATES } from '../data/buildings';
+import { BuildingType, getBuildingMultiplier, EXTRACTOR_RATES, BUILDINGS } from '../data/buildings';
 import { ITEMS } from '../data/items';
 import { Rational } from './math/rational';
 
@@ -24,6 +24,7 @@ export interface ProductionResult {
   allNodes: Map<string, ProductionNode[]>;
   buildingSummary: Map<BuildingType, Rational>;
   rawResources: Map<string, Rational>;
+  totalPower: number;
 }
 
 export type RecipeSelections = Map<string, string>; // itemId -> recipeId
@@ -195,11 +196,85 @@ export function calculateProduction(
 
   const root = buildNode(targetItemId, Rational.fromNumber(targetRatePerMinute));
 
+  // Compute total power consumption
+  let totalPower = 0;
+  for (const [bt, count] of buildingSummary) {
+    const info = BUILDINGS[bt];
+    if (info) {
+      const level = buildingLevels.get(bt) ?? 1;
+      const idx = Math.min(level, info.maxLevel) - 1;
+      const powerPerBuilding = info.powerConsumption[idx];
+      totalPower += Math.ceil(count.toNumber()) * powerPerBuilding;
+    }
+  }
+
   return {
     root,
     allNodes,
     buildingSummary,
     rawResources,
+    totalPower,
+  };
+}
+
+/**
+ * Calculate production for multiple targets and merge results.
+ * Creates a synthetic __multi_root__ node whose children are the individual roots.
+ */
+export function calculateMultiProduction(
+  targets: { itemId: string; rate: number }[],
+  recipeSelections: RecipeSelections,
+  buildingLevels: BuildingLevels
+): ProductionResult {
+  const results = targets.map((t) =>
+    calculateProduction(t.itemId, t.rate, recipeSelections, buildingLevels)
+  );
+
+  // Merge allNodes, buildingSummary, rawResources, totalPower
+  const mergedAllNodes = new Map<string, ProductionNode[]>();
+  const mergedBuildingSummary = new Map<BuildingType, Rational>();
+  const mergedRawResources = new Map<string, Rational>();
+  let mergedTotalPower = 0;
+
+  for (const result of results) {
+    for (const [itemId, nodes] of result.allNodes) {
+      const existing = mergedAllNodes.get(itemId) ?? [];
+      existing.push(...nodes);
+      mergedAllNodes.set(itemId, existing);
+    }
+    for (const [bt, count] of result.buildingSummary) {
+      const existing = mergedBuildingSummary.get(bt) ?? Rational.zero();
+      mergedBuildingSummary.set(bt, existing.add(count));
+    }
+    for (const [resId, rate] of result.rawResources) {
+      const existing = mergedRawResources.get(resId) ?? Rational.zero();
+      mergedRawResources.set(resId, existing.add(rate));
+    }
+    mergedTotalPower += result.totalPower;
+  }
+
+  // Create synthetic root
+  const totalRate = results.reduce(
+    (sum, r) => sum.add(r.root.ratePerMinute),
+    Rational.zero()
+  );
+
+  const syntheticRoot: ProductionNode = {
+    itemId: '__multi_root__',
+    itemName: 'Multi-Target',
+    ratePerMinute: totalRate,
+    recipe: null,
+    building: null,
+    children: results.map((r) => r.root),
+    isRaw: false,
+  };
+
+  return {
+    root: syntheticRoot,
+    allNodes: mergedAllNodes,
+    buildingSummary: mergedBuildingSummary,
+    rawResources: mergedRawResources,
+    totalPower: mergedTotalPower,
   };
 }
 

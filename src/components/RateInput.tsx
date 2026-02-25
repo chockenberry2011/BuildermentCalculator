@@ -1,12 +1,69 @@
+import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 
-export function RateInput() {
-  const targetRate = useStore((s) => s.targetRate);
-  const setTargetRate = useStore((s) => s.setTargetRate);
+interface RateInputProps {
+  value?: number;
+  onChange?: (rate: number) => void;
+}
+
+export function RateInput({ value, onChange }: RateInputProps) {
+  const storeRate = useStore((s) => s.targetRate);
+  const storeSetRate = useStore((s) => s.setTargetRate);
   const constraintSource = useStore((s) => s.constraintSource);
   const theme = useStore((s) => s.theme);
   const isDark = theme === 'dark';
-  const isConstraint = constraintSource.type === 'rate';
+
+  const rate = value ?? storeRate;
+  const commitRate = onChange ?? storeSetRate;
+  const isConstraint = value === undefined && constraintSource.type === 'rate';
+
+  const [localValue, setLocalValue] = useState(String(rate));
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Sync local value when external rate changes (but not while user is typing)
+  useEffect(() => {
+    setLocalValue(String(rate));
+  }, [rate]);
+
+  const commit = (val: string) => {
+    const parsed = parseFloat(val);
+    if (!isNaN(parsed) && parsed > 0) {
+      commitRate(parsed);
+    } else {
+      // Reset to last good value
+      setLocalValue(String(rate));
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setLocalValue(val);
+
+    // Debounce: commit after 300ms idle
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => commit(val), 300);
+  };
+
+  const handleBlur = () => {
+    // Commit immediately on blur
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    commit(localValue);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      commit(localValue);
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
 
   return (
     <div className="space-y-1">
@@ -22,19 +79,21 @@ export function RateInput() {
         type="number"
         min={0.1}
         step={0.1}
-        value={targetRate}
-        onChange={(e) => setTargetRate(Math.max(0.1, parseFloat(e.target.value) || 0.1))}
+        value={localValue}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
         className={`w-full px-3 h-9 sm:h-10 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent
           ${isDark
             ? 'bg-gray-700 border-gray-600 text-white'
             : 'bg-gray-50 border-gray-300 text-gray-900'
           } border ${isConstraint ? 'ring-2 ring-blue-500' : ''}`}
       />
-      {!isConstraint && (
-        <p className={`hidden sm:block text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-          Derived from {constraintSource.type === 'building' ? 'building count' : constraintSource.type === 'extractor' ? 'extractor count' : 'resource amount'}
-        </p>
-      )}
+      <p className={`hidden sm:block text-xs h-4 ${value === undefined && !isConstraint ? (isDark ? 'text-gray-500' : 'text-gray-400') : 'invisible'}`}>
+        {value === undefined && !isConstraint
+          ? `Derived from ${constraintSource.type === 'building' ? 'building count' : constraintSource.type === 'extractor' ? 'extractor count' : 'resource amount'}`
+          : '\u00A0'}
+      </p>
     </div>
   );
 }

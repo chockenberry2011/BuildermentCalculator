@@ -70,21 +70,24 @@ export function flattenToDAG(result: ProductionResult): FlatDAG {
 
   function walkEdges(node: ProductionNode) {
     for (const child of node.children) {
-      const edgeKey = `${child.itemId}->${node.itemId}`;
-      const existing = edgeMap.get(edgeKey);
-      if (existing) {
-        // Sum rates for duplicate edges
-        edgeMap.set(edgeKey, {
-          ...existing,
-          rate: existing.rate.add(child.ratePerMinute),
-        });
-      } else {
-        edgeMap.set(edgeKey, {
-          fromItemId: child.itemId,
-          toItemId: node.itemId,
-          rate: child.ratePerMinute,
-          itemName: child.itemName,
-        });
+      // Skip edges from the synthetic multi-root node
+      if (node.itemId !== '__multi_root__') {
+        const edgeKey = `${child.itemId}->${node.itemId}`;
+        const existing = edgeMap.get(edgeKey);
+        if (existing) {
+          // Sum rates for duplicate edges
+          edgeMap.set(edgeKey, {
+            ...existing,
+            rate: existing.rate.add(child.ratePerMinute),
+          });
+        } else {
+          edgeMap.set(edgeKey, {
+            fromItemId: child.itemId,
+            toItemId: node.itemId,
+            rate: child.ratePerMinute,
+            itemName: child.itemName,
+          });
+        }
       }
       walkEdges(child);
     }

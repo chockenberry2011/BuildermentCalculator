@@ -19,7 +19,7 @@ export function ViewToggle() {
         <button
           key={mode.id}
           onClick={() => setViewMode(mode.id)}
-          className={`px-4 py-2 text-sm font-medium transition
+          className={`px-3 py-1 text-xs font-medium transition
             ${viewMode === mode.id
               ? 'bg-blue-600 text-white'
               : isDark

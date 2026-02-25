@@ -4,7 +4,9 @@ import { BuildingType, EXTRACTOR_RATES } from '../data/buildings';
 import { DEFAULT_BELT_SPEED } from '../data/belts';
 import {
   calculateProduction,
+  calculateMultiProduction,
   ProductionResult,
+  ProductionNode,
   RecipeSelections,
   BuildingLevels,
   getDefaultBuildingLevels,
@@ -16,7 +18,7 @@ import {
 import { generateProposals } from '../core/FractionalSolver';
 import { calculateFromResources } from '../core/ReverseCalculator';
 import { findBestAllIntegerScale, findBestPracticalRates, BestPracticalRates } from '../core/RatioOptimizer';
-import { findPracticalRates, PracticalCandidate } from '../core/PracticalRateOptimizer';
+import { parseURLParams, updateURL } from './urlSync';
 
 export type ViewMode = 'tree' | 'blueprint';
 export type ThemeMode = 'light' | 'dark';
@@ -58,10 +60,18 @@ export interface ReverseResult {
   allBeltsClean: boolean;
 }
 
+// Multi-target production
+export interface ProductionTarget {
+  id: string;
+  itemId: string;
+  rate: number;
+}
+
 // Track which constraint is currently driving the calculation
 export type ConstraintSource =
   | { type: 'rate' }
   | { type: 'building'; buildingType: BuildingType }
+  | { type: 'itemBuilding'; itemId: string }
   | { type: 'resource'; resourceId: string }
   | { type: 'extractor'; resourceId: string };
 
@@ -69,6 +79,9 @@ interface CalculatorState {
   // Target settings
   targetItemId: string;
   targetRate: number;
+
+  // Multi-target
+  targets: ProductionTarget[];
 
   // Configuration
   recipeSelections: RecipeSelections;
@@ -82,6 +95,7 @@ interface CalculatorState {
   viewMode: ViewMode;
   theme: ThemeMode;
   optimizationDetailLevel: OptimizationDetailLevel;
+  collapsedSections: Record<string, boolean>;
 
   // Feature 1: Clean rates filter
   cleanRatesOnly: boolean;
@@ -95,10 +109,6 @@ interface CalculatorState {
   // Feature 3: Resource constraints
   resourceConstraints: ResourceConstraint[];
   reverseResult: ReverseResult | null;
-
-  // Extractor budget mode
-  extractorBudget: number | null;
-  practicalCandidates: PracticalCandidate[];
 
   // Always-computed practical rate recommendations
   referenceResult: ProductionResult | null;
@@ -124,11 +134,15 @@ interface CalculatorState {
   setCleanRatesOnly: (value: boolean) => void;
   setAutoIntegerMode: (value: boolean) => void;
   applyBestRate: () => void;
-  setExtractorBudget: (budget: number | null) => void;
   setResourceConstraints: (constraints: ResourceConstraint[]) => void;
   setRateFromBuildingCount: (buildingType: BuildingType, count: number) => void;
+  setRateFromItemBuildingCount: (itemId: string, count: number) => void;
   setRateFromResourceAmount: (resourceId: string, ratePerMinute: number) => void;
   setRateFromExtractorCount: (resourceId: string, extractorCount: number) => void;
+  toggleSection: (sectionId: string) => void;
+  addTarget: () => void;
+  removeTarget: (id: string) => void;
+  updateTarget: (id: string, partial: Partial<Pick<ProductionTarget, 'itemId' | 'rate'>>) => void;
   recalculate: () => void;
 }
 
@@ -151,12 +165,24 @@ function objectToMap<K extends string, V>(obj: Record<K, V> | undefined): Map<K,
   return map;
 }
 
+function findNodeCount(node: ProductionNode, itemId: string): number | null {
+  if (node.itemId === itemId && node.building) {
+    return node.building.count.toNumber();
+  }
+  for (const child of node.children) {
+    const found = findNodeCount(child, itemId);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
 export const useStore = create<CalculatorState>()(
   persist(
     (set, get) => ({
       // Initial state
       targetItemId: 'turbocharger',
       targetRate: 1,
+      targets: [{ id: 'default', itemId: 'turbocharger', rate: 1 }],
       recipeSelections: new Map(),
       buildingLevels: getDefaultBuildingLevels(),
       beltSpeed: DEFAULT_BELT_SPEED,
@@ -164,13 +190,12 @@ export const useStore = create<CalculatorState>()(
       viewMode: 'tree',
       theme: 'dark',
       optimizationDetailLevel: 'standard',
+      collapsedSections: { Extractors: true },
       cleanRatesOnly: false,
       autoIntegerMode: false,
       fractionalProposals: [],
       resourceConstraints: [],
       reverseResult: null,
-      extractorBudget: null,
-      practicalCandidates: [],
       referenceResult: null,
       bestPracticalRates: null,
       constraintSource: { type: 'rate' } as ConstraintSource,
@@ -179,7 +204,11 @@ export const useStore = create<CalculatorState>()(
 
       // Actions
       setTargetItem: (itemId) => {
-        set({ targetItemId: itemId });
+        const targets = [...get().targets];
+        if (targets.length > 0) {
+          targets[0] = { ...targets[0], itemId };
+        }
+        set({ targetItemId: itemId, targets });
         get().recalculate();
         if (get().autoIntegerMode) {
           get().applyBestRate();
@@ -187,7 +216,11 @@ export const useStore = create<CalculatorState>()(
       },
 
       setTargetRate: (rate) => {
-        set({ targetRate: rate, constraintSource: { type: 'rate' } });
+        const targets = [...get().targets];
+        if (targets.length > 0) {
+          targets[0] = { ...targets[0], rate };
+        }
+        set({ targetRate: rate, targets, constraintSource: { type: 'rate' } });
         get().recalculate();
       },
 
@@ -258,11 +291,6 @@ export const useStore = create<CalculatorState>()(
         }
       },
 
-      setExtractorBudget: (budget) => {
-        set({ extractorBudget: budget });
-        get().recalculate();
-      },
-
       setResourceConstraints: (constraints) => {
         const { constraintSource } = get();
         // If the constraining extractor/resource was removed, reset to rate
@@ -300,6 +328,24 @@ export const useStore = create<CalculatorState>()(
         set({
           targetRate: impliedRate,
           constraintSource: { type: 'building', buildingType },
+        });
+        get().recalculate();
+      },
+
+      setRateFromItemBuildingCount: (itemId, count) => {
+        const { targetRate, productionResult } = get();
+        if (!productionResult || count <= 0) return;
+
+        // Find the current count for this item in the production tree
+        const currentCount = findNodeCount(productionResult.root, itemId);
+        if (!currentCount || currentCount === 0) return;
+
+        // Scale proportionally: newRate / oldRate = newCount / oldCount
+        const impliedRate = targetRate * (count / currentCount);
+
+        set({
+          targetRate: impliedRate,
+          constraintSource: { type: 'itemBuilding', itemId },
         });
         get().recalculate();
       },
@@ -367,75 +413,139 @@ export const useStore = create<CalculatorState>()(
         get().recalculate();
       },
 
+      toggleSection: (sectionId) => {
+        set((state) => ({
+          collapsedSections: {
+            ...state.collapsedSections,
+            [sectionId]: !state.collapsedSections[sectionId],
+          },
+        }));
+      },
+
+      addTarget: () => {
+        const targets = [...get().targets];
+        const id = `target_${Date.now()}`;
+        targets.push({ id, itemId: 'turbocharger', rate: 1 });
+        set({ targets });
+        get().recalculate();
+      },
+
+      removeTarget: (id) => {
+        const targets = get().targets.filter((t) => t.id !== id);
+        if (targets.length === 0) return; // don't remove last target
+        // Sync aliases from first target
+        set({
+          targets,
+          targetItemId: targets[0].itemId,
+          targetRate: targets[0].rate,
+        });
+        get().recalculate();
+      },
+
+      updateTarget: (id, partial) => {
+        const targets = get().targets.map((t) =>
+          t.id === id ? { ...t, ...partial } : t
+        );
+        set({
+          targets,
+          // Keep aliases in sync with first target
+          targetItemId: targets[0].itemId,
+          targetRate: targets[0].rate,
+        });
+        get().recalculate();
+      },
+
       recalculate: () => {
         const {
           targetItemId,
           targetRate,
+          targets,
           recipeSelections,
           buildingLevels,
           beltSpeed,
           resourceConstraints,
-          extractorBudget,
         } = get();
 
-        if (!targetItemId) {
-          set({ productionResult: null, beltResult: null, fractionalProposals: [], reverseResult: null, practicalCandidates: [], referenceResult: null, bestPracticalRates: null });
-          return;
-        }
+        const isMultiTarget = targets.length > 1;
 
-        if (targetRate <= 0) {
-          set({ productionResult: null, beltResult: null, fractionalProposals: [], reverseResult: null, practicalCandidates: [], referenceResult: null, bestPracticalRates: null });
-          return;
-        }
+        if (!isMultiTarget) {
+          // Single target path (preserves optimization panel behavior)
+          if (!targetItemId) {
+            set({ productionResult: null, beltResult: null, fractionalProposals: [], reverseResult: null, referenceResult: null, bestPracticalRates: null });
+            return;
+          }
 
-        // Always calculate production from targetRate
-        const result = calculateProduction(
-          targetItemId,
-          targetRate,
-          recipeSelections,
-          buildingLevels
-        );
+          if (targetRate <= 0) {
+            set({ productionResult: null, beltResult: null, fractionalProposals: [], reverseResult: null, referenceResult: null, bestPracticalRates: null });
+            return;
+          }
 
-        const beltResult = calculateBeltRequirements(result, beltSpeed);
-        const proposals = generateProposals(result, targetRate, beltSpeed);
-
-        // If resource constraints exist, compute reverse result for utilization info
-        let reverseResult: ReverseResult | null = null;
-        if (resourceConstraints.length > 0) {
-          const reverse = calculateFromResources(
+          // Always calculate production from targetRate
+          const result = calculateProduction(
             targetItemId,
-            resourceConstraints,
+            targetRate,
             recipeSelections,
-            buildingLevels,
-            beltSpeed
+            buildingLevels
           );
-          reverseResult = reverse;
-        }
 
-        // Always compute reference result at rate=1 and best practical rates
-        const referenceResult = calculateProduction(
-          targetItemId,
-          1,
-          recipeSelections,
-          buildingLevels
-        );
-        const extractorLevel = buildingLevels.get('extractor') ?? 1;
-        let bestPracticalRates: BestPracticalRates | null = null;
-        try {
-          bestPracticalRates = findBestPracticalRates(referenceResult, extractorLevel, beltSpeed);
-        } catch {
-          // Complex recipes can exceed optimization limits; degrade gracefully
-          bestPracticalRates = null;
-        }
+          const beltResult = calculateBeltRequirements(result, beltSpeed);
+          const proposals = generateProposals(result, targetRate, beltSpeed);
 
-        // Compute practical rate candidates if extractor budget is set
-        let practicalCandidates: PracticalCandidate[] = [];
-        if (extractorBudget != null && extractorBudget > 0) {
-          const practicalResult = findPracticalRates(referenceResult, extractorBudget, extractorLevel, beltSpeed);
-          practicalCandidates = practicalResult.candidates;
-        }
+          // If resource constraints exist, compute reverse result for utilization info
+          let reverseResult: ReverseResult | null = null;
+          if (resourceConstraints.length > 0) {
+            const reverse = calculateFromResources(
+              targetItemId,
+              resourceConstraints,
+              recipeSelections,
+              buildingLevels,
+              beltSpeed
+            );
+            reverseResult = reverse;
+          }
 
-        set({ productionResult: result, beltResult, fractionalProposals: proposals, reverseResult, practicalCandidates, referenceResult, bestPracticalRates });
+          // Always compute reference result at rate=1 and best practical rates
+          const referenceResult = calculateProduction(
+            targetItemId,
+            1,
+            recipeSelections,
+            buildingLevels
+          );
+          const extractorLevel = buildingLevels.get('extractor') ?? 1;
+          let bestPracticalRates: BestPracticalRates | null = null;
+          try {
+            bestPracticalRates = findBestPracticalRates(referenceResult, extractorLevel, beltSpeed);
+          } catch {
+            // Complex recipes can exceed optimization limits; degrade gracefully
+            bestPracticalRates = null;
+          }
+
+          set({ productionResult: result, beltResult, fractionalProposals: proposals, reverseResult, referenceResult, bestPracticalRates });
+        } else {
+          // Multi-target path
+          const validTargets = targets.filter((t) => t.itemId && t.rate > 0);
+          if (validTargets.length === 0) {
+            set({ productionResult: null, beltResult: null, fractionalProposals: [], reverseResult: null, referenceResult: null, bestPracticalRates: null });
+            return;
+          }
+
+          const result = calculateMultiProduction(
+            validTargets.map((t) => ({ itemId: t.itemId, rate: t.rate })),
+            recipeSelections,
+            buildingLevels
+          );
+
+          const beltResult = calculateBeltRequirements(result, beltSpeed);
+
+          set({
+            productionResult: result,
+            beltResult,
+            fractionalProposals: [],
+            reverseResult: null,
+            referenceResult: null,
+            bestPracticalRates: null,
+          });
+        }
       },
     }),
     {
@@ -443,6 +553,7 @@ export const useStore = create<CalculatorState>()(
       partialize: (state) => ({
         targetItemId: state.targetItemId,
         targetRate: state.targetRate,
+        targets: state.targets,
         recipeSelections: mapToObject(state.recipeSelections),
         buildingLevels: mapToObject(state.buildingLevels),
         beltSpeed: state.beltSpeed,
@@ -453,9 +564,9 @@ export const useStore = create<CalculatorState>()(
         cleanRatesOnly: state.cleanRatesOnly,
         autoIntegerMode: state.autoIntegerMode,
         resourceConstraints: state.resourceConstraints,
-        extractorBudget: state.extractorBudget,
+        collapsedSections: state.collapsedSections,
       }),
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state, error) => {
         if (state) {
           // Convert persisted objects back to Maps
           state.recipeSelections = objectToMap(state.recipeSelections as unknown as Record<string, string>);
@@ -466,11 +577,53 @@ export const useStore = create<CalculatorState>()(
             state.viewMode = 'blueprint';
           }
 
+          // Migrate old format: create targets from targetItemId/targetRate
+          if (!state.targets || !Array.isArray(state.targets) || state.targets.length === 0) {
+            state.targets = [{ id: 'default', itemId: state.targetItemId, rate: state.targetRate }];
+          }
+
           // Ensure all building types have default levels
           const defaults = getDefaultBuildingLevels();
           for (const [key, value] of defaults) {
             if (!state.buildingLevels.has(key)) {
               state.buildingLevels.set(key, value);
+            }
+          }
+
+          // Detect system color scheme for first-time visitors (no persisted theme)
+          if (error || !localStorage.getItem('builderment-optimizer')) {
+            const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+            state.theme = prefersDark ? 'dark' : 'light';
+          }
+
+          // URL params override persisted state
+          const urlState = parseURLParams();
+          if (urlState.targets && urlState.targets.length > 0) {
+            state.targets = urlState.targets.map((t, i) => ({
+              id: i === 0 ? 'default' : `target_${i}`,
+              itemId: t.itemId,
+              rate: t.rate,
+            }));
+            state.targetItemId = state.targets[0].itemId;
+            state.targetRate = state.targets[0].rate;
+          } else {
+            if (urlState.item) state.targetItemId = urlState.item;
+            if (urlState.rate !== undefined) state.targetRate = urlState.rate;
+            // Sync targets[0] with single-target URL params
+            if (urlState.item || urlState.rate !== undefined) {
+              state.targets = [{ id: 'default', itemId: state.targetItemId, rate: state.targetRate }];
+            }
+          }
+          if (urlState.belt !== undefined) state.beltSpeed = urlState.belt;
+          if (urlState.view) state.viewMode = urlState.view;
+          if (urlState.recipes) {
+            for (const [k, v] of urlState.recipes) {
+              state.recipeSelections.set(k, v);
+            }
+          }
+          if (urlState.levels) {
+            for (const [k, v] of urlState.levels) {
+              state.buildingLevels.set(k as BuildingType, v);
             }
           }
 
@@ -482,8 +635,21 @@ export const useStore = create<CalculatorState>()(
   )
 );
 
-// Initialize calculation on first load
+// Subscribe to state changes and update URL
 if (typeof window !== 'undefined') {
+  useStore.subscribe((state) => {
+    updateURL({
+      targetItemId: state.targetItemId,
+      targetRate: state.targetRate,
+      beltSpeed: state.beltSpeed,
+      viewMode: state.viewMode,
+      recipeSelections: state.recipeSelections,
+      buildingLevels: state.buildingLevels,
+      targets: state.targets,
+    });
+  });
+
+  // Initialize calculation on first load
   setTimeout(() => {
     useStore.getState().recalculate();
   }, 0);

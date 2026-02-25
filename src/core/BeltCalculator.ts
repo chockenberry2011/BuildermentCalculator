@@ -114,19 +114,6 @@ export function calculateBeltRequirements(
 }
 
 /**
- * Format belt requirement for display.
- */
-export function formatBeltRequirement(connection: BeltConnection): string {
-  if (connection.status === 'multi-belt') {
-    return `${connection.beltsNeeded} belts`;
-  }
-  if (connection.status === 'near-capacity') {
-    return `${Math.round(connection.utilization * 100)}% belt`;
-  }
-  return `${connection.beltsNeeded} belt${connection.beltsNeeded > 1 ? 's' : ''}`;
-}
-
-/**
  * Check if a production result has all clean belt connections at the given belt speed.
  */
 export function hasAllCleanBelts(result: ProductionResult, beltSpeed: number): boolean {
