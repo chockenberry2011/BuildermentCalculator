@@ -85,7 +85,7 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
           </div>
         )}
         {count && !count.isInteger && (
-          <SplitBadge count={building!.count} variant="line" />
+          <SplitBadge count={building!.count} variant="line" isDark={isDark} />
         )}
       </div>
 

@@ -9,6 +9,7 @@ import { FlatEdge } from '../../core/GraphFlattener';
 import { BeltStatus } from '../../data/belts';
 import { getItemColor } from '../../data/itemColors';
 import { BeltIcon } from '../BeltIcon';
+import { BadgePopover } from '../BadgePopover';
 
 export interface BlueprintEdgeData {
   flatEdge: FlatEdge;
@@ -79,6 +80,41 @@ export const BlueprintEdge = memo(function BlueprintEdge({
   const pillBorder = beltStatus !== 'ok' ? '' : (isDark ? 'border-gray-600' : 'border-gray-300');
   const pillBorderStyle = beltStatus !== 'ok' ? statusColor : undefined;
 
+  const utilizationPct = Math.round(utilization * 100);
+  const beltLabel = beltStatus === 'multi-belt'
+    ? `\u00D7${beltsNeeded}`
+    : `${utilizationPct}%`;
+
+  const tooltipText = `${beltsNeeded} belt${beltsNeeded > 1 ? 's' : ''} \u00B7 ${utilizationPct}%`;
+
+  const labelClass = isDark ? 'text-gray-400' : 'text-gray-500';
+  const dividerClass = isDark ? 'border-gray-600' : 'border-gray-200';
+
+  const popoverContent = (
+    <div className="space-y-1.5">
+      <div className="font-semibold text-sm mb-2">Belt Details</div>
+      <div className="flex justify-between">
+        <span className={labelClass}>Belts needed</span>
+        <span className="font-medium">{beltsNeeded}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className={labelClass}>Utilization</span>
+        <span className="font-medium">{utilizationPct}%</span>
+      </div>
+      <div className="flex justify-between">
+        <span className={labelClass}>Throughput</span>
+        <span className="font-medium">{formatRate(rate)}/min</span>
+      </div>
+      <div className={`border-t my-2 ${dividerClass}`} />
+      <div className="flex justify-between">
+        <span className={labelClass}>Status</span>
+        <span className="font-medium" style={{ color: statusColor }}>
+          {beltStatus === 'multi-belt' ? 'Multi-belt' : 'Near capacity'}
+        </span>
+      </div>
+    </div>
+  );
+
   return (
     <>
       <path
@@ -104,7 +140,7 @@ export const BlueprintEdge = memo(function BlueprintEdge({
       />
       <EdgeLabelRenderer>
         <div
-          className={`absolute flex items-center gap-0.5 text-[10px] ${pillBg} ${pillText} border ${pillBorder} rounded px-1.5 py-0.5 pointer-events-none leading-tight`}
+          className={`absolute flex items-center gap-0.5 text-[10px] ${pillBg} ${pillText} border ${pillBorder} rounded px-1.5 py-0.5 leading-tight ${showBeltIndicator ? 'pointer-events-auto' : 'pointer-events-none'}`}
           style={{
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             ...(pillBorderStyle ? { borderColor: pillBorderStyle } : {}),
@@ -112,14 +148,16 @@ export const BlueprintEdge = memo(function BlueprintEdge({
         >
           {rateText}
           {showBeltIndicator && (
-            <>
-              <BeltIcon size={10} color={statusColor} />
-              <span style={{ color: statusColor }}>
-                {beltStatus === 'multi-belt'
-                  ? `\u00D7${beltsNeeded}`
-                  : `${Math.round(utilization * 100)}%`}
+            <BadgePopover
+              isDark={isDark}
+              tooltipContent={tooltipText}
+              popoverContent={popoverContent}
+            >
+              <span className="inline-flex items-center gap-0.5 cursor-pointer">
+                <BeltIcon size={10} color={statusColor} />
+                <span style={{ color: statusColor }}>{beltLabel}</span>
               </span>
-            </>
+            </BadgePopover>
           )}
         </div>
       </EdgeLabelRenderer>

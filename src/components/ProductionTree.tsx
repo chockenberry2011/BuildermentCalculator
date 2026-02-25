@@ -4,7 +4,7 @@ import { getItemColor } from '../data/itemColors';
 import { useStore } from '../store/useStore';
 import { BeltCalculationResult } from '../core/BeltCalculator';
 import { BuildingIcon } from './BuildingIcon';
-import { BeltIcon } from './BeltIcon';
+import { BeltBadge } from './BeltBadge';
 import { EditableBuildingCount } from './EditableBuildingCount';
 import { SplitBadge } from './SplitBadge';
 
@@ -12,13 +12,12 @@ interface TreeNodeProps {
   node: ProductionNode;
   depth: number;
   isDark: boolean;
-  showBeltInfo: boolean;
   beltResult: BeltCalculationResult | null;
   setRateFromItemBuildingCount: (itemId: string, count: number) => void;
   constraintSource: { type: string; itemId?: string };
 }
 
-function TreeNode({ node, depth, isDark, showBeltInfo, beltResult, setRateFromItemBuildingCount, constraintSource }: TreeNodeProps) {
+function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCount, constraintSource }: TreeNodeProps) {
   const indent = depth * 16;
 
   const buildingInfo = node.building;
@@ -30,7 +29,7 @@ function TreeNode({ node, depth, isDark, showBeltInfo, beltResult, setRateFromIt
   const isConstraint = constraintSource.type === 'itemBuilding' && constraintSource.itemId === node.itemId;
 
   // Find belt connection for this node (from this item to its parent)
-  const beltConnection = showBeltInfo && beltResult
+  const beltConnection = beltResult
     ? beltResult.connections.find((c) => c.fromItemId === node.itemId)
     : null;
 
@@ -84,28 +83,17 @@ function TreeNode({ node, depth, isDark, showBeltInfo, beltResult, setRateFromIt
           </div>
         )}
 
-        {/* Belt info — only show for bottleneck or near-capacity */}
-        {beltConnection && beltConnection.status !== 'ok' && (
-          <span
-            className={`inline-flex items-center gap-0.5 whitespace-nowrap flex-shrink-0 text-xs px-1.5 py-0.5 rounded ml-1.5 ${
-              beltConnection.status === 'multi-belt'
-                ? 'bg-blue-900 text-blue-300'
-                : 'bg-yellow-900 text-yellow-300'
-            }`}
-            title={`${beltConnection.throughputPerMinute.toNumber().toFixed(1)}/min throughput, ${Math.round(beltConnection.utilization * 100)}% belt utilization`}
-          >
-            <BeltIcon
-              size={12}
-              color={beltConnection.status === 'multi-belt' ? '#93C5FD' : '#FDE68A'}
-            />
-            {beltConnection.status === 'multi-belt'
-              ? `\u00D7${beltConnection.beltsNeeded}`
-              : `${Math.round(beltConnection.utilization * 100)}%`}
-          </span>
+        {/* Belt info — only show for multi-belt or near-capacity */}
+        {beltConnection && (
+          <BeltBadge
+            beltConnection={beltConnection}
+            buildingCount={buildingInfo?.count}
+            isDark={isDark}
+          />
         )}
 
         {buildingInfo && !buildingInfo.count.isInteger() && (
-          <SplitBadge count={buildingInfo.count} />
+          <SplitBadge count={buildingInfo.count} isDark={isDark} />
         )}
       </div>
 
@@ -116,7 +104,6 @@ function TreeNode({ node, depth, isDark, showBeltInfo, beltResult, setRateFromIt
           node={child}
           depth={depth + 1}
           isDark={isDark}
-          showBeltInfo={showBeltInfo}
           beltResult={beltResult}
           setRateFromItemBuildingCount={setRateFromItemBuildingCount}
           constraintSource={constraintSource}
@@ -129,7 +116,6 @@ function TreeNode({ node, depth, isDark, showBeltInfo, beltResult, setRateFromIt
 export function ProductionTree() {
   const productionResult = useStore((s) => s.productionResult);
   const beltResult = useStore((s) => s.beltResult);
-  const showBeltInfo = useStore((s) => s.showBeltInfo);
   const targetRate = useStore((s) => s.targetRate);
   const theme = useStore((s) => s.theme);
   const setRateFromItemBuildingCount = useStore((s) => s.setRateFromItemBuildingCount);
@@ -164,7 +150,6 @@ export function ProductionTree() {
               node={child}
               depth={0}
               isDark={isDark}
-              showBeltInfo={showBeltInfo}
               beltResult={beltResult}
               setRateFromItemBuildingCount={setRateFromItemBuildingCount}
               constraintSource={constraintSource}
@@ -186,7 +171,6 @@ export function ProductionTree() {
             node={productionResult.root}
             depth={0}
             isDark={isDark}
-            showBeltInfo={showBeltInfo}
             beltResult={beltResult}
             setRateFromItemBuildingCount={setRateFromItemBuildingCount}
             constraintSource={constraintSource}

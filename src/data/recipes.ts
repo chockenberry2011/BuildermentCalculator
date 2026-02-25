@@ -627,6 +627,20 @@ const DEFAULT_RECIPES: Recipe[] = [
     isAlternate: false,
   },
 
+  // Machine Shop - Empty Fuel Cell
+  {
+    id: 'empty_fuel_cell',
+    outputId: 'empty_fuel_cell',
+    outputQuantity: 1,
+    building: 'machine_shop',
+    craftTime: 15,
+    ingredients: [
+      { itemId: 'tungsten_carbide', quantity: 3 },
+      { itemId: 'glass', quantity: 5 },
+    ],
+    isAlternate: false,
+  },
+
   // Earth Teleporter
   {
     id: 'earth_token',
@@ -639,171 +653,174 @@ const DEFAULT_RECIPES: Recipe[] = [
   },
 ];
 
-// Alternate recipes
+// Alternate recipes — correct Builderment game data
 const ALTERNATE_RECIPES: Recipe[] = [
-  // Copper Wire from Copper Ore (skip smelting)
+  // 1. Copper Wire ALT
   {
     id: 'copper_wire_alt',
     outputId: 'copper_wire',
-    outputQuantity: 1,
+    outputQuantity: 8,
     building: 'workshop',
-    craftTime: 3,
-    ingredients: [{ itemId: 'copper_ore', quantity: 2 }],
+    craftTime: 16,
+    ingredients: [{ itemId: 'carbon_fiber', quantity: 1 }],
     isAlternate: true,
-    alternateName: 'Direct Wire',
+    alternateName: 'Carbon Fiber Wire',
   },
-  // Steel alternate using Coal directly
-  {
-    id: 'steel_alt',
-    outputId: 'steel',
-    outputQuantity: 1,
-    building: 'furnace',
-    craftTime: 5,
-    ingredients: [
-      { itemId: 'iron_ore', quantity: 2 },
-      { itemId: 'coal', quantity: 2 },
-    ],
-    isAlternate: true,
-    alternateName: 'Direct Steel',
-  },
-  // Iron Gear alternate
+  // 2. Iron Gear ALT
   {
     id: 'iron_gear_alt',
     outputId: 'iron_gear',
-    outputQuantity: 1,
+    outputQuantity: 8,
     building: 'workshop',
-    craftTime: 4,
-    ingredients: [{ itemId: 'iron_ore', quantity: 3 }],
+    craftTime: 16,
+    ingredients: [{ itemId: 'steel', quantity: 1 }],
     isAlternate: true,
-    alternateName: 'Quick Gear',
+    alternateName: 'Steel Gear',
   },
-  // Logic Circuit alternate
+  // 3. Electromagnet ALT
+  {
+    id: 'electromagnet_alt',
+    outputId: 'electromagnet',
+    outputQuantity: 12,
+    building: 'machine_shop',
+    craftTime: 16,
+    ingredients: [
+      { itemId: 'nano_wire', quantity: 1 },
+      { itemId: 'steel_rod', quantity: 1 },
+    ],
+    isAlternate: true,
+    alternateName: 'Nano Wire Magnet',
+  },
+  // 4. Logic Circuit ALT
   {
     id: 'logic_circuit_alt',
     outputId: 'logic_circuit',
     outputQuantity: 1,
     building: 'machine_shop',
-    craftTime: 5,
-    ingredients: [
-      { itemId: 'copper_wire', quantity: 4 },
-      { itemId: 'graphite', quantity: 2 },
-      { itemId: 'gold_ingot', quantity: 1 },
-    ],
-    isAlternate: true,
-    alternateName: 'Gold Circuit',
-  },
-  // Heat Sink alternate
-  {
-    id: 'heat_sink_alt',
-    outputId: 'heat_sink',
-    outputQuantity: 1,
-    building: 'workshop',
     craftTime: 4,
     ingredients: [
-      { itemId: 'copper_ingot', quantity: 3 },
-      { itemId: 'aluminum_ingot', quantity: 1 },
+      { itemId: 'iron_plating', quantity: 1 },
+      { itemId: 'heat_sink', quantity: 1 },
     ],
     isAlternate: true,
-    alternateName: 'Aluminum Heat Sink',
+    alternateName: 'Plated Circuit',
   },
-  // Computer alternate
-  {
-    id: 'computer_alt',
-    outputId: 'computer',
-    outputQuantity: 1,
-    building: 'industrial_factory',
-    craftTime: 12,
-    ingredients: [
-      { itemId: 'logic_circuit', quantity: 4 },
-      { itemId: 'heat_sink', quantity: 2 },
-    ],
-    isAlternate: true,
-    alternateName: 'Simple Computer',
-  },
-  // Battery alternate
-  {
-    id: 'battery_alt',
-    outputId: 'battery',
-    outputQuantity: 1,
-    building: 'machine_shop',
-    craftTime: 6,
-    ingredients: [
-      { itemId: 'aluminum_sheet', quantity: 2 },
-      { itemId: 'graphite', quantity: 4 },
-    ],
-    isAlternate: true,
-    alternateName: 'Aluminum Battery',
-  },
-  // Electric Motor alternate
-  {
-    id: 'electric_motor_alt',
-    outputId: 'electric_motor',
-    outputQuantity: 1,
-    building: 'industrial_factory',
-    craftTime: 10,
-    ingredients: [
-      { itemId: 'battery', quantity: 2 },
-      { itemId: 'electromagnet', quantity: 4 },
-    ],
-    isAlternate: true,
-    alternateName: 'Simple Motor',
-  },
-  // Coil alternate
-  {
-    id: 'coil_alt',
-    outputId: 'coil',
-    outputQuantity: 1,
-    building: 'machine_shop',
-    craftTime: 5,
-    ingredients: [
-      { itemId: 'aluminum_rod', quantity: 1 },
-      { itemId: 'copper_wire', quantity: 8 },
-    ],
-    isAlternate: true,
-    alternateName: 'Aluminum Coil',
-  },
-  // Rotor alternate
+  // 5. Rotor ALT
   {
     id: 'rotor_alt',
     outputId: 'rotor',
     outputQuantity: 1,
     building: 'machine_shop',
-    craftTime: 5,
+    craftTime: 6,
     ingredients: [
-      { itemId: 'aluminum_rod', quantity: 2 },
-      { itemId: 'iron_gear', quantity: 2 },
+      { itemId: 'copper_ingot', quantity: 18 },
+      { itemId: 'iron_plating', quantity: 18 },
     ],
     isAlternate: true,
-    alternateName: 'Aluminum Rotor',
+    alternateName: 'Heavy Rotor',
   },
-  // Turbocharger alternate
+  // 6. Tungsten Carbide ALT
+  {
+    id: 'tungsten_carbide_alt',
+    outputId: 'tungsten_carbide',
+    outputQuantity: 2,
+    building: 'forge',
+    craftTime: 10,
+    ingredients: [
+      { itemId: 'tungsten_ingot', quantity: 1 },
+      { itemId: 'steel', quantity: 1 },
+    ],
+    isAlternate: true,
+    alternateName: 'Steel Carbide',
+  },
+  // 7. Steel ALT
+  {
+    id: 'steel_alt',
+    outputId: 'steel',
+    outputQuantity: 1,
+    building: 'forge',
+    craftTime: 8,
+    ingredients: [
+      { itemId: 'coal', quantity: 4 },
+      { itemId: 'iron_ore', quantity: 4 },
+    ],
+    isAlternate: true,
+    alternateName: 'Direct Steel',
+  },
+  // 8. Concrete ALT
+  {
+    id: 'concrete_alt',
+    outputId: 'concrete',
+    outputQuantity: 1,
+    building: 'forge',
+    craftTime: 8,
+    ingredients: [
+      { itemId: 'stone', quantity: 20 },
+      { itemId: 'wood_frame', quantity: 4 },
+    ],
+    isAlternate: true,
+    alternateName: 'Stone Concrete',
+  },
+  // 9. Electric Motor ALT
+  {
+    id: 'electric_motor_alt',
+    outputId: 'electric_motor',
+    outputQuantity: 1,
+    building: 'industrial_factory',
+    craftTime: 20,
+    ingredients: [
+      { itemId: 'electromagnet', quantity: 6 },
+      { itemId: 'steel', quantity: 6 },
+      { itemId: 'empty_fuel_cell', quantity: 1 },
+    ],
+    isAlternate: true,
+    alternateName: 'Fuel Cell Motor',
+  },
+  // 10. Industrial Frame ALT
+  {
+    id: 'industrial_frame_alt',
+    outputId: 'industrial_frame',
+    outputQuantity: 1,
+    building: 'industrial_factory',
+    craftTime: 20,
+    ingredients: [
+      { itemId: 'steel', quantity: 18 },
+      { itemId: 'glass', quantity: 10 },
+      { itemId: 'carbon_fiber', quantity: 4 },
+    ],
+    isAlternate: true,
+    alternateName: 'Carbon Frame',
+  },
+  // 11. Turbocharger ALT
   {
     id: 'turbocharger_alt',
     outputId: 'turbocharger',
     outputQuantity: 1,
     building: 'manufacturer',
-    craftTime: 12,
+    craftTime: 15,
     ingredients: [
-      { itemId: 'rotor', quantity: 2 },
-      { itemId: 'logic_circuit', quantity: 2 },
-      { itemId: 'coupler', quantity: 4 },
+      { itemId: 'heat_sink', quantity: 4 },
+      { itemId: 'computer', quantity: 1 },
+      { itemId: 'gyroscope', quantity: 1 },
     ],
     isAlternate: true,
-    alternateName: 'Rotor Turbocharger',
+    alternateName: 'Gyro Turbocharger',
   },
-  // Concrete alternate
+  // 12. Super Computer ALT
   {
-    id: 'concrete_alt',
-    outputId: 'concrete',
+    id: 'super_computer_alt',
+    outputId: 'super_computer',
     outputQuantity: 2,
-    building: 'industrial_factory',
-    craftTime: 6,
+    building: 'manufacturer',
+    craftTime: 30,
     ingredients: [
-      { itemId: 'sand', quantity: 4 },
-      { itemId: 'iron_plating', quantity: 1 },
+      { itemId: 'computer', quantity: 2 },
+      { itemId: 'silicon', quantity: 40 },
+      { itemId: 'gyroscope', quantity: 2 },
+      { itemId: 'industrial_frame', quantity: 1 },
     ],
     isAlternate: true,
-    alternateName: 'Bulk Concrete',
+    alternateName: 'Silicon Super Computer',
   },
 ];
 

@@ -1,6 +1,8 @@
 import { Rational } from '../core/math/rational';
 import { getSplitInfo } from '../core/splitInfo';
 import { fractionSimplicityScore } from '../core/RatioOptimizer';
+import { getQualityLabel, getCountColor } from '../core/countColor';
+import { BadgePopover } from './BadgePopover';
 
 interface SplitIconProps {
   size?: number;
@@ -32,9 +34,10 @@ function SplitIcon({ size = 12, color = 'currentColor' }: SplitIconProps) {
 interface SplitBadgeProps {
   count: Rational;
   variant?: 'pill' | 'line';
+  isDark?: boolean;
 }
 
-export function SplitBadge({ count, variant = 'pill' }: SplitBadgeProps) {
+export function SplitBadge({ count, variant = 'pill', isDark = false }: SplitBadgeProps) {
   const info = getSplitInfo(count);
   if (!info) return null;
 
@@ -55,26 +58,79 @@ export function SplitBadge({ count, variant = 'pill' }: SplitBadgeProps) {
   const lineStyles = { good: 'text-green-400', decent: 'text-green-300', bad: 'text-red-400' };
   const lineIconColors = { good: 'rgb(74,222,128)', decent: 'rgb(134,239,172)', bad: 'rgb(248,113,113)' };
 
+  // Shared popover content for both variants
+  const qualityLabel = getQualityLabel(score);
+  const qualityColor = getCountColor(score, isDark);
+  const dividerClass = isDark ? 'border-gray-600' : 'border-gray-200';
+  const labelClass = isDark ? 'text-gray-400' : 'text-gray-500';
+
+  const tooltipText = `Build ${info.actualBuildings}: ${info.fullBuildings} full + 1 splits ${info.splitNumerator}/${info.splitDenominator}`;
+
+  const popoverDetail = (
+    <div className="space-y-1.5">
+      <div className="font-semibold text-sm mb-2">Split Details</div>
+      <div className="flex justify-between">
+        <span className={labelClass}>Actual buildings</span>
+        <span className="font-medium">{info.actualBuildings}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className={labelClass}>Full output</span>
+        <span className="font-medium">{info.fullBuildings}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className={labelClass}>Split ratio</span>
+        <span className="font-medium">{info.splitNumerator}/{info.splitDenominator}</span>
+      </div>
+      <div className={`border-t my-2 ${dividerClass}`} />
+      <div className="flex justify-between items-center">
+        <span className={labelClass}>Simplicity</span>
+        <span className="font-medium" style={{ color: qualityColor }}>{qualityLabel}</span>
+      </div>
+    </div>
+  );
+
+  // Line variant — compact inline with popover
   if (variant === 'line') {
-    return (
+    const lineContent = (
       <div
         className={`text-[10px] flex items-center gap-0.5 mt-0.5 ${lineStyles[tier]}`}
-        title={info.tooltip}
       >
         <SplitIcon size={10} color={lineIconColors[tier]} />
         {info.shortLabel}
       </div>
     );
+
+    return (
+      <BadgePopover
+        isDark={isDark}
+        tooltipContent={tooltipText}
+        popoverContent={popoverDetail}
+      >
+        {lineContent}
+      </BadgePopover>
+    );
   }
 
-  return (
+  // Pill variant — compact with popover
+  const compactLabel = count.toNumber().toFixed(2);
+
+  const pill = (
     <span
       className={`inline-flex items-center gap-0.5 whitespace-nowrap flex-shrink-0 text-xs px-1.5 py-0.5 rounded ml-1.5 ${pillStyles[tier]}`}
       style={pillBg ? { backgroundColor: pillBg } : undefined}
-      title={info.tooltip}
     >
       <SplitIcon size={12} color={iconColors[tier]} />
-      {info.shortLabel}
+      {compactLabel}
     </span>
+  );
+
+  return (
+    <BadgePopover
+      isDark={isDark}
+      tooltipContent={tooltipText}
+      popoverContent={popoverDetail}
+    >
+      {pill}
+    </BadgePopover>
   );
 }

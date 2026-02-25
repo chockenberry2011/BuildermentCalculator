@@ -1,9 +1,24 @@
-import { getRecipesForItem, hasAlternateRecipes } from '../data/recipes';
+import { getRecipesForItem, hasAlternateRecipes, Recipe } from '../data/recipes';
 import { ITEMS } from '../data/items';
+import { BUILDINGS } from '../data/buildings';
 import { useStore } from '../store/useStore';
 
 interface RecipePickerProps {
   itemId: string;
+}
+
+function RecipeDetails({ recipe, isDark }: { recipe: Recipe; isDark: boolean }) {
+  const ingredients = recipe.ingredients
+    .map((ing) => `${ing.quantity}× ${ITEMS[ing.itemId]?.name ?? ing.itemId}`)
+    .join(' + ');
+  const output = `${recipe.outputQuantity}× ${ITEMS[recipe.outputId]?.name ?? recipe.outputId}`;
+  const building = BUILDINGS[recipe.building]?.name ?? recipe.building;
+
+  return (
+    <div className={`text-xs mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+      {ingredients} → {output} ({building})
+    </div>
+  );
 }
 
 export function RecipePicker({ itemId }: RecipePickerProps) {
@@ -18,28 +33,34 @@ export function RecipePicker({ itemId }: RecipePickerProps) {
 
   const recipes = getRecipesForItem(itemId);
   const selectedId = recipeSelections.get(itemId) ?? recipes[0]?.id;
+  const selectedRecipe = recipes.find((r) => r.id === selectedId) ?? recipes[0];
   const item = ITEMS[itemId];
 
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+    <div className="text-sm">
+      <div className={isDark ? 'text-gray-400' : 'text-gray-600'}>
         {item?.name ?? itemId}:
-      </span>
-      <select
-        value={selectedId}
-        onChange={(e) => setRecipeSelection(itemId, e.target.value)}
-        className={`px-2 py-1 rounded text-sm focus:ring-2 focus:ring-blue-500
-          ${isDark
-            ? 'bg-gray-700 border-gray-600 text-white'
-            : 'bg-gray-50 border-gray-300 text-gray-900'
-          } border`}
-      >
+      </div>
+      <div className={`mt-1 inline-flex rounded-lg overflow-hidden border ${
+        isDark ? 'border-gray-600' : 'border-gray-300'
+      }`}>
         {recipes.map((recipe) => (
-          <option key={recipe.id} value={recipe.id}>
-            {recipe.isAlternate ? recipe.alternateName : 'Default'}
-          </option>
+          <button
+            key={recipe.id}
+            onClick={() => setRecipeSelection(itemId, recipe.id)}
+            className={`px-3 py-1 text-xs font-medium transition
+              ${selectedId === recipe.id
+                ? 'bg-blue-600 text-white'
+                : isDark
+                  ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+              }`}
+          >
+            {recipe.isAlternate ? 'Alternate' : 'Standard'}
+          </button>
         ))}
-      </select>
+      </div>
+      {selectedRecipe && <RecipeDetails recipe={selectedRecipe} isDark={isDark} />}
     </div>
   );
 }

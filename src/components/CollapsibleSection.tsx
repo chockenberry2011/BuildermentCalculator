@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore';
 
 interface CollapsibleSectionProps {
   title: string;
+  subtitle?: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
   isOpen?: boolean;
@@ -12,6 +13,7 @@ interface CollapsibleSectionProps {
 
 export function CollapsibleSection({
   title,
+  subtitle,
   children,
   defaultOpen = true,
   isOpen: controlledIsOpen,
@@ -52,8 +54,15 @@ export function CollapsibleSection({
         onClick={handleToggle}
         onKeyDown={handleKeyDown}
       >
-        <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
-          {title}
+        <span className="flex items-baseline gap-2">
+          <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            {title}
+          </span>
+          {subtitle && (
+            <span className={`hidden sm:inline text-xs font-normal ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+              {subtitle}
+            </span>
+          )}
         </span>
         {headerRight && (
           // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events

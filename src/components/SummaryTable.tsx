@@ -60,20 +60,22 @@ export function SummaryTable() {
         </div>
       </div>
 
-      {/* Power Consumption */}
-      {productionResult.totalPower > 0 && (
-        <div className={`mt-3 pt-3 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-          <h3 className={`font-semibold text-sm mb-1 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+      {/* Power Consumption — future feature */}
+      <div className={`mt-3 pt-3 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+        <div className="flex items-center gap-2">
+          <h3 className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
             Power Consumption
           </h3>
-          <div className={`text-sm font-mono ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-            {productionResult.totalPower.toLocaleString()} W total
-          </div>
-          <p className={`text-xs mt-1 ${isDark ? 'text-yellow-500' : 'text-yellow-600'}`}>
-            Placeholder values — actual game data may differ
-          </p>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+            isDark ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-500'
+          }`}>
+            Coming soon
+          </span>
         </div>
-      )}
+        <p className={`text-xs mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+          Power tracking is planned for a future update.
+        </p>
+      </div>
 
       {/* Belt Analysis */}
       {showBeltInfo && beltResult && (

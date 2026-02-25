@@ -56,6 +56,7 @@ export const ITEMS: Record<string, Item> = {
   gyroscope: { id: 'gyroscope', name: 'Gyroscope', category: 'component' },
   pump: { id: 'pump', name: 'Pump', category: 'component' },
   nano_wire: { id: 'nano_wire', name: 'Nano Wire', category: 'component' },
+  empty_fuel_cell: { id: 'empty_fuel_cell', name: 'Empty Fuel Cell', category: 'component' },
 
   // Advanced Components
   energy_cube: { id: 'energy_cube', name: 'Energy Cube', category: 'advanced' },

@@ -139,6 +139,7 @@ interface CalculatorState {
   setRateFromItemBuildingCount: (itemId: string, count: number) => void;
   setRateFromResourceAmount: (resourceId: string, ratePerMinute: number) => void;
   setRateFromExtractorCount: (resourceId: string, extractorCount: number) => void;
+  resetCalculator: () => void;
   toggleSection: (sectionId: string) => void;
   addTarget: () => void;
   removeTarget: (id: string) => void;
@@ -190,7 +191,7 @@ export const useStore = create<CalculatorState>()(
       viewMode: 'tree',
       theme: 'dark',
       optimizationDetailLevel: 'standard',
-      collapsedSections: { Extractors: true },
+      collapsedSections: {},
       cleanRatesOnly: false,
       autoIntegerMode: false,
       fractionalProposals: [],
@@ -409,6 +410,22 @@ export const useStore = create<CalculatorState>()(
           targetRate: impliedRate,
           resourceConstraints: updatedConstraints,
           constraintSource: { type: 'extractor', resourceId },
+        });
+        get().recalculate();
+      },
+
+      resetCalculator: () => {
+        set({
+          targetItemId: 'wood_plank',
+          targetRate: 1,
+          targets: [{ id: 'default', itemId: 'wood_plank', rate: 1 }],
+          recipeSelections: new Map(),
+          resourceConstraints: [],
+          constraintSource: { type: 'rate' },
+          reverseResult: null,
+          fractionalProposals: [],
+          autoIntegerMode: false,
+          cleanRatesOnly: false,
         });
         get().recalculate();
       },
