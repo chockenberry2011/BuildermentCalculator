@@ -23,6 +23,8 @@ export interface FlatDAG {
   edges: FlatEdge[];
 }
 
+export type LayoutOrientation = 'horizontal' | 'vertical';
+
 /**
  * Flatten the recursive ProductionNode tree into a deduplicated DAG.
  * Each item appears exactly once; rates are summed across all tree occurrences.
@@ -104,8 +106,9 @@ export function flattenToDAG(result: ProductionResult): FlatDAG {
 /**
  * Compute layout positions for the DAG using topological ranking.
  * Raw resources on left (rank 0), final product on right (highest rank).
+ * When orientation is 'vertical', x/y are swapped so flow goes top-to-bottom.
  */
-export function layoutDAG(dag: FlatDAG): Map<string, { x: number; y: number }> {
+export function layoutDAG(dag: FlatDAG, orientation: LayoutOrientation = 'horizontal'): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>();
 
   if (dag.nodes.length === 0) return positions;
@@ -341,6 +344,13 @@ export function layoutDAG(dag: FlatDAG): Map<string, { x: number; y: number }> {
   // Remove dummy nodes from output positions
   for (const dummyId of dummyIds) {
     positions.delete(dummyId);
+  }
+
+  // For vertical orientation, swap x and y so flow goes top-to-bottom
+  if (orientation === 'vertical') {
+    for (const [itemId, pos] of positions) {
+      positions.set(itemId, { x: pos.y, y: pos.x });
+    }
   }
 
   return positions;

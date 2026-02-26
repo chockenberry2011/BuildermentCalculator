@@ -10,6 +10,7 @@ import { BeltStatus } from '../../data/belts';
 import { getItemColor } from '../../data/itemColors';
 import { BeltIcon } from '../BeltIcon';
 import { BadgePopover } from '../BadgePopover';
+import { useZoomLevel } from '../../hooks/useZoomLevel';
 
 export interface BlueprintEdgeData {
   flatEdge: FlatEdge;
@@ -18,6 +19,7 @@ export interface BlueprintEdgeData {
   utilization: number;
   maxRate: number;
   isDark: boolean;
+  isDimmed?: boolean;
   [key: string]: unknown;
 }
 
@@ -50,9 +52,11 @@ export const BlueprintEdge = memo(function BlueprintEdge({
   targetPosition,
   data,
 }: EdgeProps<BlueprintEdgeType>) {
+  const zoomLevel = useZoomLevel();
+
   if (!data) return null;
 
-  const { flatEdge, beltStatus, beltsNeeded, utilization, maxRate, isDark } = data;
+  const { flatEdge, beltStatus, beltsNeeded, utilization, maxRate, isDark, isDimmed } = data;
   const rate = flatEdge.rate.toNumber();
   const itemColor = getItemColor(flatEdge.fromItemId);
   const statusColor = STATUS_COLORS[beltStatus];
@@ -70,6 +74,26 @@ export const BlueprintEdge = memo(function BlueprintEdge({
     targetPosition,
     borderRadius: 8,
   });
+
+  const edgeOpacity = isDimmed ? 0.15 : 0.85;
+
+  // Mini zoom: path only, no labels
+  if (zoomLevel === 'mini') {
+    return (
+      <path
+        id={id}
+        className="react-flow__edge-path"
+        d={edgePath}
+        style={{
+          stroke: itemColor,
+          strokeWidth: clamp(2, relativeWidth * 5, 6),
+          fill: 'none',
+          opacity: edgeOpacity,
+          transition: 'opacity 0.2s',
+        }}
+      />
+    );
+  }
 
   // Build label content
   const rateText = `${formatRate(rate)}/min`;
@@ -90,6 +114,49 @@ export const BlueprintEdge = memo(function BlueprintEdge({
   const labelClass = isDark ? 'text-gray-400' : 'text-gray-500';
   const dividerClass = isDark ? 'border-gray-600' : 'border-gray-200';
 
+  // Compact zoom: rate label only, no belt popover
+  if (zoomLevel === 'compact') {
+    return (
+      <>
+        <path
+          id={id}
+          className="react-flow__edge-path blueprint-edge-flow"
+          d={edgePath}
+          style={{
+            stroke: itemColor,
+            strokeWidth,
+            strokeDasharray: `${strokeWidth * 2} ${strokeWidth * 1.5}`,
+            fill: 'none',
+            opacity: edgeOpacity,
+            transition: 'opacity 0.2s',
+          }}
+        />
+        <path
+          d={edgePath}
+          style={{
+            stroke: 'transparent',
+            strokeWidth: strokeWidth + 10,
+            fill: 'none',
+          }}
+        />
+        <EdgeLabelRenderer>
+          <div
+            className={`absolute text-[10px] ${pillBg} ${pillText} border ${pillBorder} rounded px-1 py-0.5 leading-tight pointer-events-none`}
+            style={{
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              ...(pillBorderStyle ? { borderColor: pillBorderStyle } : {}),
+              opacity: isDimmed ? 0.25 : 1,
+              transition: 'opacity 0.2s',
+            }}
+          >
+            {rateText}
+          </div>
+        </EdgeLabelRenderer>
+      </>
+    );
+  }
+
+  // Full zoom: complete render with belt popover
   const popoverContent = (
     <div className="space-y-1.5">
       <div className="font-semibold text-sm mb-2">Belt Details</div>
@@ -126,7 +193,8 @@ export const BlueprintEdge = memo(function BlueprintEdge({
           strokeWidth,
           strokeDasharray: `${strokeWidth * 2} ${strokeWidth * 1.5}`,
           fill: 'none',
-          opacity: 0.85,
+          opacity: edgeOpacity,
+          transition: 'opacity 0.2s',
         }}
       />
       {/* Invisible wider path for easier hover/selection */}
@@ -144,6 +212,8 @@ export const BlueprintEdge = memo(function BlueprintEdge({
           style={{
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             ...(pillBorderStyle ? { borderColor: pillBorderStyle } : {}),
+            opacity: isDimmed ? 0.25 : 1,
+            transition: 'opacity 0.2s',
           }}
         >
           {rateText}

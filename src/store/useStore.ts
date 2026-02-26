@@ -23,6 +23,7 @@ import { parseURLParams, updateURL } from './urlSync';
 export type ViewMode = 'tree' | 'blueprint';
 export type ThemeMode = 'light' | 'dark';
 export type OptimizationDetailLevel = 'minimal' | 'standard' | 'full';
+export type BlueprintOrientation = 'horizontal' | 'vertical';
 
 // Feature 2: Fractional building fix suggestions
 export interface ScalingSuggestion {
@@ -95,6 +96,7 @@ interface CalculatorState {
   viewMode: ViewMode;
   theme: ThemeMode;
   optimizationDetailLevel: OptimizationDetailLevel;
+  blueprintOrientation: BlueprintOrientation;
   collapsedSections: Record<string, boolean>;
 
   // Feature 1: Clean rates filter
@@ -128,6 +130,7 @@ interface CalculatorState {
   setBuildingLevel: (building: BuildingType, level: number) => void;
   setViewMode: (mode: ViewMode) => void;
   setOptimizationDetailLevel: (level: OptimizationDetailLevel) => void;
+  setBlueprintOrientation: (orientation: BlueprintOrientation) => void;
   toggleTheme: () => void;
   setBeltSpeed: (speed: number) => void;
   toggleBeltInfo: () => void;
@@ -191,6 +194,7 @@ export const useStore = create<CalculatorState>()(
       viewMode: 'tree',
       theme: 'dark',
       optimizationDetailLevel: 'standard',
+      blueprintOrientation: 'horizontal' as BlueprintOrientation,
       collapsedSections: {},
       cleanRatesOnly: false,
       autoIntegerMode: false,
@@ -245,6 +249,10 @@ export const useStore = create<CalculatorState>()(
 
       setViewMode: (mode) => {
         set({ viewMode: mode });
+      },
+
+      setBlueprintOrientation: (orientation) => {
+        set({ blueprintOrientation: orientation });
       },
 
       toggleTheme: () => {
@@ -578,6 +586,7 @@ export const useStore = create<CalculatorState>()(
         viewMode: state.viewMode,
         theme: state.theme,
         optimizationDetailLevel: state.optimizationDetailLevel,
+        blueprintOrientation: state.blueprintOrientation,
         cleanRatesOnly: state.cleanRatesOnly,
         autoIntegerMode: state.autoIntegerMode,
         resourceConstraints: state.resourceConstraints,
