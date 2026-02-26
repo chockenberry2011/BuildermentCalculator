@@ -13,9 +13,9 @@ export function TargetList() {
   const isSingleTarget = targets.length === 1;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {targets.map((target, index) => (
-        <div key={target.id} className="flex flex-col sm:flex-row gap-3 sm:items-end">
+        <div key={target.id} className="flex flex-col sm:flex-row gap-2 sm:items-end">
           <div className="flex-1">
             {isSingleTarget ? (
               <ItemSelector />
@@ -39,7 +39,7 @@ export function TargetList() {
           {!isSingleTarget && (
             <button
               onClick={() => removeTarget(target.id)}
-              className={`h-9 sm:h-10 px-2 rounded-lg border transition-colors flex-shrink-0
+              className={`h-9 sm:h-10 group-[]/sticky:h-8 group-[]/sticky:sm:h-8 px-2 rounded-lg border transition-colors flex-shrink-0
                 ${isDark
                   ? 'border-gray-600 text-gray-400 hover:bg-red-900/30 hover:text-red-400 hover:border-red-700'
                   : 'border-gray-300 text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-300'
@@ -55,7 +55,7 @@ export function TargetList() {
       ))}
       <button
         onClick={addTarget}
-        className={`text-xs px-3 py-1.5 rounded-lg border border-dashed transition-colors
+        className={`text-xs px-3 py-1.5 group-[]/sticky:py-1 rounded-lg border border-dashed transition-colors
           ${isDark
             ? 'border-gray-600 text-gray-400 hover:border-blue-500 hover:text-blue-400'
             : 'border-gray-300 text-gray-500 hover:border-blue-500 hover:text-blue-600'

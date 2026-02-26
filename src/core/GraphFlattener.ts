@@ -264,13 +264,25 @@ export function layoutDAG(dag: FlatDAG, orientation: LayoutOrientation = 'horizo
     dfsForOrder(dummyId);
   }
 
-  // Dynamic ySpacing based on column density
+  // Dynamic ySpacing based on column density AND edge corridor density
   const xSpacing = 280;
   let maxNodesInRank = 0;
   for (const [, items] of rankGroups) {
     maxNodesInRank = Math.max(maxNodesInRank, items.length);
   }
-  const ySpacing = Math.max(130, maxNodesInRank * 20 + 70);
+  // Count edges crossing each rank-to-rank corridor (including long-span edges)
+  let maxEdgesInCorridor = 0;
+  const corridorCounts = new Map<number, number>();
+  for (const edge of dag.edges) {
+    const fromRank = ranks.get(edge.fromItemId) ?? 0;
+    const toRank = ranks.get(edge.toItemId) ?? 0;
+    for (let r = fromRank; r < toRank; r++) {
+      const count = (corridorCounts.get(r) ?? 0) + 1;
+      corridorCounts.set(r, count);
+      maxEdgesInCorridor = Math.max(maxEdgesInCorridor, count);
+    }
+  }
+  const ySpacing = Math.max(130, maxNodesInRank * 20 + 70, maxEdgesInCorridor * 25 + 50);
 
   // Initial Y positions: order within each rank by DFS discovery order
   for (const [rank, items] of rankGroups) {

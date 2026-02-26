@@ -82,53 +82,57 @@ function AppContent() {
       </header>
 
       {/* Main content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        {/* Zone A: Always-visible top bar with item selector + rate input */}
-        <div className={`${isDark ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 sticky top-0 z-10`}>
-          <TargetList />
-        </div>
+      <main className="py-4 sm:py-6">
+        {/* Zone 1: Constrained top */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className={`group/sticky ${isDark ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg p-2 sm:p-3 mb-4 sm:mb-6 sticky top-0 z-10 shadow-sm`}>
+            <TargetList />
+          </div>
 
-        {/* Zone B: 3-column grid (1 sidebar + 2 center) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Center column (2 cols on desktop) — first on mobile */}
-          <div className="lg:col-span-2 lg:order-2 space-y-3 sm:space-y-4 order-1">
-            {/* Optimization Panel */}
-            {bestPracticalRates && (
+          {bestPracticalRates && (
+            <div className="mb-4 sm:mb-6">
               <CollapsibleSection title="Optimal Rates" isOpen={!collapsedSections['Optimal Rates']} onToggle={() => toggleSection('Optimal Rates')}>
                 <OptimizationPanel />
               </CollapsibleSection>
-            )}
+            </div>
+          )}
+        </div>
 
-            {/* Production View */}
-            <CollapsibleSection title="Production View" isOpen={!collapsedSections['Production View']} onToggle={() => toggleSection('Production View')} headerRight={<ViewToggle />}>
-              {viewMode === 'tree' ? <ProductionTree /> : <BlueprintFlowView />}
+        {/* Zone 2: Full-width production view */}
+        <div className="px-4 sm:px-6 mb-4 sm:mb-6">
+          <CollapsibleSection title="Production View" isOpen={!collapsedSections['Production View']} onToggle={() => toggleSection('Production View')} headerRight={<ViewToggle />}>
+            {viewMode === 'tree' ? <ProductionTree /> : <BlueprintFlowView />}
+          </CollapsibleSection>
+        </div>
+
+        {/* Zone 3: Constrained bottom */}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-4 sm:space-y-6">
+          {productionResult && (
+            <CollapsibleSection title="Raw Resources" subtitle="Total resources needed from the map" isOpen={!collapsedSections['Raw Resources']} onToggle={() => toggleSection('Raw Resources')}>
+              <SummaryTable />
             </CollapsibleSection>
+          )}
 
-            {/* Production Summary */}
-            {productionResult && (
-              <CollapsibleSection title="Raw Resources" subtitle="Total resources needed from the map" isOpen={!collapsedSections['Raw Resources']} onToggle={() => toggleSection('Raw Resources')}>
-                <SummaryTable />
+          <div className="lg:grid lg:grid-cols-2 lg:gap-6 space-y-2 sm:space-y-4 lg:space-y-0">
+            <div className="space-y-2 sm:space-y-4">
+              <CollapsibleSection title="Extractors" subtitle="Extractors needed for current production" isOpen={!collapsedSections['Extractors']} onToggle={() => toggleSection('Extractors')}>
+                <ResourceInput />
               </CollapsibleSection>
-            )}
-          </div>
 
-          {/* Config sidebar — second on mobile, first on desktop */}
-          <div className="lg:col-span-1 lg:order-1 space-y-2 sm:space-y-4 order-2">
-            <CollapsibleSection title="Extractors" subtitle="Extractors needed for current production" isOpen={!collapsedSections['Extractors']} onToggle={() => toggleSection('Extractors')}>
-              <ResourceInput />
-            </CollapsibleSection>
+              <CollapsibleSection title="Settings" subtitle="Belt tier and display options" isOpen={!collapsedSections['Settings']} onToggle={() => toggleSection('Settings')}>
+                <SettingsSection />
+              </CollapsibleSection>
+            </div>
 
-            <CollapsibleSection title="Recipes" subtitle="Choose alternate recipes for items" isOpen={!collapsedSections['Recipes']} onToggle={() => toggleSection('Recipes')}>
-              <RecipePickerList />
-            </CollapsibleSection>
+            <div className="space-y-2 sm:space-y-4">
+              <CollapsibleSection title="Recipes" subtitle="Choose alternate recipes for items" isOpen={!collapsedSections['Recipes']} onToggle={() => toggleSection('Recipes')}>
+                <RecipePickerList />
+              </CollapsibleSection>
 
-            <CollapsibleSection title="Settings" subtitle="Belt tier and display options" isOpen={!collapsedSections['Settings']} onToggle={() => toggleSection('Settings')}>
-              <SettingsSection />
-            </CollapsibleSection>
-
-            <CollapsibleSection title="Recipe Book" subtitle="Verify recipe data" isOpen={!collapsedSections['Recipe Book']} onToggle={() => toggleSection('Recipe Book')}>
-              <RecipeBook />
-            </CollapsibleSection>
+              <CollapsibleSection title="Recipe Book" subtitle="Verify recipe data" isOpen={!collapsedSections['Recipe Book']} onToggle={() => toggleSection('Recipe Book')}>
+                <RecipeBook />
+              </CollapsibleSection>
+            </div>
           </div>
         </div>
       </main>

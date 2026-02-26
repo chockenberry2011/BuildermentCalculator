@@ -66,8 +66,8 @@ export function RateInput({ value, onChange }: RateInputProps) {
   }, []);
 
   return (
-    <div className="space-y-1">
-      <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'} flex items-center gap-2`}>
+    <div className="space-y-1 group-[]/sticky:space-y-0">
+      <label className={`block text-xs font-medium group-[]/sticky:hidden ${isDark ? 'text-gray-300' : 'text-gray-700'} flex items-center gap-2`}>
         Rate/min
         {isConstraint && (
           <span className="text-xs px-1.5 py-0.5 rounded bg-blue-600 text-blue-100" title="This value is driving the calculation">
@@ -83,13 +83,13 @@ export function RateInput({ value, onChange }: RateInputProps) {
         onChange={handleChange}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        className={`w-full px-3 h-9 sm:h-10 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent
+        className={`w-full px-3 h-9 sm:h-10 group-[]/sticky:h-8 group-[]/sticky:sm:h-8 group-[]/sticky:text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent
           ${isDark
             ? 'bg-gray-700 border-gray-600 text-white'
             : 'bg-gray-50 border-gray-300 text-gray-900'
           } border ${isConstraint ? 'ring-2 ring-blue-500' : ''}`}
       />
-      <p className={`hidden sm:block text-xs h-4 ${value === undefined && !isConstraint ? (isDark ? 'text-gray-500' : 'text-gray-400') : 'invisible'}`}>
+      <p className={`hidden sm:block group-[]/sticky:!hidden text-xs h-4 ${value === undefined && !isConstraint ? (isDark ? 'text-gray-500' : 'text-gray-400') : 'invisible'}`}>
         {value === undefined && !isConstraint
           ? `Derived from ${constraintSource.type === 'building' ? 'building count' : constraintSource.type === 'extractor' ? 'extractor count' : 'resource amount'}`
           : '\u00A0'}

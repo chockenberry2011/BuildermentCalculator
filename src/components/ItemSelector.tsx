@@ -132,8 +132,8 @@ export function ItemSelector({ value, onSelect }: ItemSelectorProps) {
   let runningIndex = 0;
 
   return (
-    <div className="space-y-1 relative" ref={containerRef}>
-      <label className={`block text-xs font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+    <div className="space-y-1 group-[]/sticky:space-y-0 relative" ref={containerRef}>
+      <label className={`block text-xs font-medium group-[]/sticky:hidden ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
         Item
       </label>
       <input
@@ -150,7 +150,7 @@ export function ItemSelector({ value, onSelect }: ItemSelectorProps) {
           setQuery('');
         }}
         onKeyDown={handleKeyDown}
-        className={`w-full px-3 h-9 sm:h-10 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent
+        className={`w-full px-3 h-9 sm:h-10 group-[]/sticky:h-8 group-[]/sticky:sm:h-8 group-[]/sticky:text-sm rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent
           ${isDark
             ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
             : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500'
@@ -160,7 +160,7 @@ export function ItemSelector({ value, onSelect }: ItemSelectorProps) {
         aria-autocomplete="list"
         aria-activedescendant={isOpen && flatItems[highlightIndex] ? `item-${flatItems[highlightIndex].id}` : undefined}
       />
-      <p className="hidden sm:block text-xs h-4 invisible">&nbsp;</p>
+      <p className="hidden sm:block group-[]/sticky:!hidden text-xs h-4 invisible">&nbsp;</p>
       {isOpen && (
         <div
           ref={dropdownRef}

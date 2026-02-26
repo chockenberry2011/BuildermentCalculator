@@ -21,6 +21,8 @@ export interface BlueprintNodeData {
   isDimmed?: boolean;
   isSelected?: boolean;
   orientation?: BlueprintOrientation;
+  isCompleted?: boolean;
+  onToggleCompleted?: () => void;
   [key: string]: unknown;
 }
 
@@ -172,6 +174,7 @@ function MiniNode({
   outputItemIds,
   isDark,
   orientation,
+  isCompleted,
 }: {
   flatNode: FlatNode;
   accentColor: string;
@@ -179,6 +182,7 @@ function MiniNode({
   outputItemIds: string[];
   isDark: boolean;
   orientation: BlueprintOrientation;
+  isCompleted: boolean;
 }) {
   return (
     <BadgePopover
@@ -192,7 +196,7 @@ function MiniNode({
           width: 60,
           height: 24,
           backgroundColor: accentColor,
-          opacity: 0.9,
+          opacity: isCompleted ? 0.4 : 0.9,
         }}
       >
         <NodeHandles
@@ -218,6 +222,8 @@ function CompactNode({
   isRoot,
   isSelected,
   orientation,
+  isCompleted,
+  onToggleCompleted,
 }: {
   flatNode: FlatNode;
   accentColor: string;
@@ -227,10 +233,14 @@ function CompactNode({
   isRoot: boolean;
   isSelected: boolean;
   orientation: BlueprintOrientation;
+  isCompleted: boolean;
+  onToggleCompleted?: () => void;
 }) {
   const building = flatNode.building;
   const count = building ? formatCount(building.count) : null;
-  const bgColor = isDark ? 'bg-gray-800' : 'bg-white';
+  const bgColor = isCompleted
+    ? (isDark ? 'bg-green-900/60' : 'bg-green-100')
+    : (isDark ? 'bg-gray-800' : 'bg-white');
   const textColor = isDark ? 'text-gray-100' : 'text-gray-900';
   const borderClass = isSelected
     ? 'ring-2 ring-yellow-400 ring-offset-1 ring-offset-transparent'
@@ -244,11 +254,11 @@ function CompactNode({
       style={{
         width: 140,
         height: 40,
-        border: `1px solid ${isDark ? '#374151' : '#D1D5DB'}`,
+        border: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
       }}
     >
       <div className="h-0.5" style={{ backgroundColor: accentColor }} />
-      <div className="px-2 py-1 flex items-center gap-1.5">
+      <div className="px-2 py-1 flex items-center gap-1.5 relative">
         <span className={`font-bold text-xs ${textColor} truncate flex-1`}>
           {flatNode.itemName}
         </span>
@@ -259,6 +269,24 @@ function CompactNode({
           >
             {count.text}x
           </span>
+        )}
+        {onToggleCompleted && (
+          <button
+            className="shrink-0 pointer-events-auto"
+            onClick={(e) => { e.stopPropagation(); onToggleCompleted(); }}
+            title={isCompleted ? 'Mark as not built' : 'Mark as built'}
+          >
+            {isCompleted ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <path d="m9 12 2 2 4-4" stroke="white" strokeWidth="2.5" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={isDark ? '#6B7280' : '#9CA3AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+              </svg>
+            )}
+          </button>
         )}
       </div>
       <NodeHandles
@@ -283,6 +311,8 @@ function FullNode({
   isRoot,
   isSelected,
   orientation,
+  isCompleted,
+  onToggleCompleted,
 }: {
   flatNode: FlatNode;
   accentColor: string;
@@ -292,13 +322,17 @@ function FullNode({
   isRoot: boolean;
   isSelected: boolean;
   orientation: BlueprintOrientation;
+  isCompleted: boolean;
+  onToggleCompleted?: () => void;
 }) {
   const building = flatNode.building;
   const buildingType = building?.buildingType ?? 'workshop';
   const buildingName = building ? (BUILDINGS[building.buildingType]?.name ?? '') : '';
   const count = building ? formatCount(building.count) : null;
 
-  const bgColor = isDark ? 'bg-gray-800' : 'bg-white';
+  const bgColor = isCompleted
+    ? (isDark ? 'bg-green-900/60' : 'bg-green-100')
+    : (isDark ? 'bg-gray-800' : 'bg-white');
   const textColor = isDark ? 'text-gray-100' : 'text-gray-900';
   const subtextColor = isDark ? 'text-gray-400' : 'text-gray-500';
   const borderClass = isSelected
@@ -310,14 +344,34 @@ function FullNode({
   return (
     <div
       className={`rounded-lg shadow-lg ${bgColor} ${borderClass} min-w-[170px] max-w-[200px] overflow-hidden`}
-      style={{ border: `1px solid ${isDark ? '#374151' : '#D1D5DB'}` }}
+      style={{ border: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}` }}
     >
       {/* Accent bar */}
       <div className="h-1" style={{ backgroundColor: accentColor }} />
 
-      <div className="px-3 py-2">
+      <div className="px-3 py-2 relative">
+        {/* Progress checkbox */}
+        {onToggleCompleted && (
+          <button
+            className="absolute top-1.5 right-1.5 pointer-events-auto"
+            onClick={(e) => { e.stopPropagation(); onToggleCompleted(); }}
+            title={isCompleted ? 'Mark as not built' : 'Mark as built'}
+          >
+            {isCompleted ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <path d="m9 12 2 2 4-4" stroke="white" strokeWidth="2.5" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isDark ? '#6B7280' : '#9CA3AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+              </svg>
+            )}
+          </button>
+        )}
+
         {/* Item name */}
-        <div className={`font-bold text-sm ${textColor} truncate`}>
+        <div className={`font-bold text-sm ${textColor} truncate pr-5`}>
           {flatNode.itemName}
         </div>
 
@@ -361,10 +415,11 @@ function FullNode({
 }
 
 export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
-  const { flatNode, inputItemIds, outputItemIds, isDark, isRoot, isDimmed, isSelected, orientation } = data as BlueprintNodeData;
+  const { flatNode, inputItemIds, outputItemIds, isDark, isRoot, isDimmed, isSelected, orientation, isCompleted, onToggleCompleted } = data as BlueprintNodeData;
   const accentColor = getItemColor(flatNode.itemId);
   const zoomLevel: ZoomLevel = useZoomLevel();
   const orient = orientation ?? 'horizontal';
+  const completed = isCompleted ?? false;
 
   const dimStyle = isDimmed ? { opacity: 0.25, transition: 'opacity 0.2s' } : { transition: 'opacity 0.2s' };
 
@@ -378,6 +433,7 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
           outputItemIds={outputItemIds}
           isDark={isDark}
           orientation={orient}
+          isCompleted={completed}
         />
       </div>
     );
@@ -395,6 +451,8 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
           isRoot={isRoot}
           isSelected={isSelected ?? false}
           orientation={orient}
+          isCompleted={completed}
+          onToggleCompleted={onToggleCompleted}
         />
       </div>
     );
@@ -411,6 +469,8 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
         isRoot={isRoot}
         isSelected={isSelected ?? false}
         orientation={orient}
+        isCompleted={completed}
+        onToggleCompleted={onToggleCompleted}
       />
     </div>
   );

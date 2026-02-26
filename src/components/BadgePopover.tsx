@@ -159,6 +159,15 @@ export function BadgePopover({ children, tooltipContent, popoverContent, isDark 
           className={`z-[9999] min-w-[220px] rounded-lg border shadow-xl p-3 text-xs ${popoverBg}`}
           style={{ top: pos.top, left: pos.left, position: 'absolute' }}
         >
+          <button
+            onClick={() => setShowPopover(false)}
+            className={`absolute top-1.5 right-1.5 p-0.5 rounded ${isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
+            aria-label="Close"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M2 2l6 6M8 2l-6 6" />
+            </svg>
+          </button>
           {popoverContent}
         </div>,
         document.body,

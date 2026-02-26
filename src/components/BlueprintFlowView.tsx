@@ -22,6 +22,7 @@ import { BlueprintEdge, type BlueprintEdgeData } from './blueprint/BlueprintEdge
 import { BlueprintSearch } from './blueprint/BlueprintSearch';
 import { BlueprintLegend } from './blueprint/BlueprintLegend';
 import { getItemColor } from '../data/itemColors';
+import { BUILDINGS } from '../data/buildings';
 import { classifyBeltStatus, getBeltsNeeded, getBeltUtilization } from '../data/belts';
 
 const nodeTypes = { blueprint: BlueprintNode };
@@ -45,6 +46,8 @@ function buildReactFlowData(
   rootItemId: string,
   orientation: BlueprintOrientation,
   rootItemIds?: Set<string>,
+  blueprintProgress?: Map<string, boolean>,
+  toggleBlueprintProgress?: (itemId: string) => void,
 ): { rfNodes: Node[]; rfEdges: Edge[]; adjacency: AdjacencyMaps } {
   const inputsOf = new Map<string, string[]>();
   const outputsOf = new Map<string, string[]>();
@@ -91,8 +94,9 @@ function buildReactFlowData(
     const nodeInputs = inputsOf.get(flatNode.itemId) ?? [];
     const nodeOutputs = outputsOf.get(flatNode.itemId) ?? [];
 
+    const itemId = flatNode.itemId;
     return {
-      id: flatNode.itemId,
+      id: itemId,
       type: 'blueprint',
       position: pos,
       data: {
@@ -100,11 +104,75 @@ function buildReactFlowData(
         inputItemIds: nodeInputs,
         outputItemIds: nodeOutputs,
         isDark,
-        isRoot: rootItemIds ? rootItemIds.has(flatNode.itemId) : flatNode.itemId === rootItemId,
+        isRoot: rootItemIds ? rootItemIds.has(itemId) : itemId === rootItemId,
         orientation,
+        isCompleted: blueprintProgress?.get(itemId) ?? false,
+        onToggleCompleted: toggleBlueprintProgress ? () => toggleBlueprintProgress(itemId) : undefined,
       } satisfies BlueprintNodeData,
     };
   });
+
+  // Build a lookup for source node info (for belt distribution and building share)
+  const nodeInfoMap = new Map<string, typeof dag.nodes[0]>();
+  for (const node of dag.nodes) {
+    nodeInfoMap.set(node.itemId, node);
+  }
+
+  // Detect edges whose smooth-step paths would visually overlap.
+  // Two edges overlap when they share the same rank-to-rank corridor (overlapping
+  // X range) and their midpoint Y values are close. For overlapping groups, spread
+  // the stepPosition (where the path bends, 0–1) so each edge bends at a different
+  // X, naturally separating both the dashed lines and the rate labels.
+  const OVERLAP_THRESHOLD = 40; // px — how close midpointY must be to count as overlap
+
+  const edgeInfos = dag.edges.map((edge) => {
+    const srcPos = positions.get(edge.fromItemId) ?? { x: 0, y: 0 };
+    const tgtPos = positions.get(edge.toItemId) ?? { x: 0, y: 0 };
+    return {
+      edge,
+      midY: (srcPos.y + tgtPos.y) / 2,
+      minX: Math.min(srcPos.x, tgtPos.x),
+      maxX: Math.max(srcPos.x, tgtPos.x),
+    };
+  });
+
+  edgeInfos.sort((a, b) => a.midY - b.midY);
+
+  const stepPositions = new Map<string, number>();
+  const assigned = new Set<number>();
+
+  for (let i = 0; i < edgeInfos.length; i++) {
+    if (assigned.has(i)) continue;
+    const group = [i];
+    assigned.add(i);
+
+    for (let j = i + 1; j < edgeInfos.length; j++) {
+      if (assigned.has(j)) continue;
+      const withinThreshold = group.some(
+        (gi) => Math.abs(edgeInfos[j].midY - edgeInfos[gi].midY) <= OVERLAP_THRESHOLD,
+      );
+      if (!withinThreshold) break;
+
+      const candidate = edgeInfos[j];
+      const overlaps = group.some((gi) => {
+        const member = edgeInfos[gi];
+        return member.minX < candidate.maxX && candidate.minX < member.maxX;
+      });
+      if (overlaps) {
+        group.push(j);
+        assigned.add(j);
+      }
+    }
+
+    if (group.length > 1) {
+      // Spread stepPosition evenly from 0.3 to 0.7 across the group
+      for (let g = 0; g < group.length; g++) {
+        const t = group.length === 1 ? 0.5 : 0.3 + (g / (group.length - 1)) * 0.4;
+        const key = `${edgeInfos[group[g]].edge.fromItemId}->${edgeInfos[group[g]].edge.toItemId}`;
+        stepPositions.set(key, t);
+      }
+    }
+  }
 
   const rfEdges: Edge[] = dag.edges.map((flatEdge) => {
     const rate = flatEdge.rate.toNumber();
@@ -112,8 +180,12 @@ function buildReactFlowData(
     const beltsNeeded = getBeltsNeeded(rate, beltSpeed);
     const utilization = getBeltUtilization(rate, beltSpeed);
 
+    const key = `${flatEdge.fromItemId}->${flatEdge.toItemId}`;
+    const sourceNode = nodeInfoMap.get(flatEdge.fromItemId);
+    const srcBuilding = sourceNode?.building ?? null;
+
     return {
-      id: `${flatEdge.fromItemId}->${flatEdge.toItemId}`,
+      id: key,
       source: flatEdge.fromItemId,
       target: flatEdge.toItemId,
       sourceHandle: `out-${flatEdge.toItemId}`,
@@ -126,6 +198,12 @@ function buildReactFlowData(
         utilization,
         maxRate,
         isDark,
+        sourceBuildingCount: srcBuilding?.count ?? null,
+        sourceTotalRate: sourceNode?.totalRate ?? null,
+        sourceBuildingType: srcBuilding?.buildingType ?? null,
+        sourceBuildingName: srcBuilding ? (BUILDINGS[srcBuilding.buildingType]?.name ?? null) : null,
+        sourceIsRaw: sourceNode?.isRaw ?? false,
+        stepPosition: stepPositions.get(key) ?? 0.5,
       } satisfies BlueprintEdgeData,
     };
   });
@@ -180,6 +258,8 @@ function BlueprintFlowInner({
   onViewportChange,
   orientation,
   onToggleOrientation,
+  hasProgress,
+  onClearProgress,
 }: {
   initialNodes: Node[];
   initialEdges: Edge[];
@@ -191,6 +271,8 @@ function BlueprintFlowInner({
   onViewportChange: (viewport: Viewport) => void;
   orientation: BlueprintOrientation;
   onToggleOrientation: () => void;
+  hasProgress: boolean;
+  onClearProgress: () => void;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -342,25 +424,17 @@ function BlueprintFlowInner({
     [],
   );
 
-  // Collect item names for search and legend
-  const searchItems = useMemo(
-    () =>
-      initialNodes.map((n) => ({
-        id: n.id,
-        name: (n.data as BlueprintNodeData).flatNode.itemName,
-      })),
-    [initialNodes],
-  );
-
-  const legendItems = useMemo(
-    () =>
-      initialNodes.map((n) => ({
-        id: n.id,
-        name: (n.data as BlueprintNodeData).flatNode.itemName,
-        color: getItemColor(n.id),
-      })),
-    [initialNodes],
-  );
+  // Collect item info for search and legend (single pass)
+  const { searchItems, legendItems } = useMemo(() => {
+    const searchItems: { id: string; name: string }[] = [];
+    const legendItems: { id: string; name: string; color: string }[] = [];
+    for (const n of initialNodes) {
+      const name = (n.data as BlueprintNodeData).flatNode.itemName;
+      searchItems.push({ id: n.id, name });
+      legendItems.push({ id: n.id, name, color: getItemColor(n.id) });
+    }
+    return { searchItems, legendItems };
+  }, [initialNodes]);
 
   return (
     <div
@@ -402,21 +476,32 @@ function BlueprintFlowInner({
         />
         <BlueprintLegend items={legendItems} isDark={isDark} />
         <Panel position="top-left">
-          <button
-            onClick={onToggleOrientation}
-            className={`${isDark ? 'bg-gray-800 border-gray-600 text-gray-300 hover:text-gray-100' : 'bg-white border-gray-300 text-gray-500 hover:text-gray-900'} border rounded-md p-1.5 shadow-sm`}
-            title={`Switch to ${orientation === 'horizontal' ? 'vertical' : 'horizontal'} layout`}
-          >
-            {orientation === 'horizontal' ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 3v18" /><path d="m8 7-4 5 4 5" /><path d="m16 7 4 5-4 5" />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 12h18" /><path d="m7 8-5 4 5 4" /><path d="m17 8 5 4-5 4" />
-              </svg>
+          <div className="flex gap-1.5">
+            <button
+              onClick={onToggleOrientation}
+              className={`${isDark ? 'bg-gray-800 border-gray-600 text-gray-300 hover:text-gray-100' : 'bg-white border-gray-300 text-gray-500 hover:text-gray-900'} border rounded-md p-1.5 shadow-sm`}
+              title={`Switch to ${orientation === 'horizontal' ? 'vertical' : 'horizontal'} layout`}
+            >
+              {orientation === 'horizontal' ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 3v18" /><path d="m8 7-4 5 4 5" /><path d="m16 7 4 5-4 5" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12h18" /><path d="m7 8-5 4 5 4" /><path d="m17 8 5 4-5 4" />
+                </svg>
+              )}
+            </button>
+            {hasProgress && (
+              <button
+                onClick={onClearProgress}
+                className={`${isDark ? 'bg-gray-800 border-gray-600 text-gray-300 hover:text-gray-100' : 'bg-white border-gray-300 text-gray-500 hover:text-gray-900'} border rounded-md px-2 py-1.5 shadow-sm text-xs`}
+                title="Reset progress"
+              >
+                Reset progress
+              </button>
             )}
-          </button>
+          </div>
         </Panel>
       </ReactFlow>
     </div>
@@ -442,6 +527,9 @@ export function BlueprintFlowView() {
   const targets = useStore((s) => s.targets);
   const orientation = useStore((s) => s.blueprintOrientation);
   const setBlueprintOrientation = useStore((s) => s.setBlueprintOrientation);
+  const blueprintProgress = useStore((s) => s.blueprintProgress);
+  const toggleBlueprintProgress = useStore((s) => s.toggleBlueprintProgress);
+  const clearBlueprintProgress = useStore((s) => s.clearBlueprintProgress);
 
   const rootItemIds = useMemo(() => {
     if (targets.length > 1) {
@@ -479,9 +567,11 @@ export function BlueprintFlowView() {
       targetItemId,
       orientation,
       rootItemIds,
+      blueprintProgress,
+      toggleBlueprintProgress,
     );
     return { initialNodes: rfNodes, initialEdges: rfEdges, adjacency };
-  }, [productionResult, beltSpeed, isDark, targetItemId, rootItemIds, orientation]);
+  }, [productionResult, beltSpeed, isDark, targetItemId, rootItemIds, orientation, blueprintProgress, toggleBlueprintProgress]);
 
   // Structural key for detecting graph topology changes
   const structureKey = useMemo(() => {
@@ -539,6 +629,8 @@ export function BlueprintFlowView() {
         onViewportChange={handleViewportChange}
         orientation={orientation}
         onToggleOrientation={toggleOrientation}
+        hasProgress={blueprintProgress.size > 0}
+        onClearProgress={clearBlueprintProgress}
       />
     </ReactFlowProvider>
   );

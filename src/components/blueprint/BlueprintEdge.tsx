@@ -6,11 +6,15 @@ import {
   type Edge,
 } from '@xyflow/react';
 import { FlatEdge } from '../../core/GraphFlattener';
+import { Rational } from '../../core/math/rational';
 import { BeltStatus } from '../../data/belts';
+import { getBeltDistribution } from '../../core/beltDistribution';
 import { getItemColor } from '../../data/itemColors';
 import { BeltIcon } from '../BeltIcon';
+import { BuildingIcon } from '../BuildingIcon';
 import { BadgePopover } from '../BadgePopover';
 import { useZoomLevel } from '../../hooks/useZoomLevel';
+import type { BuildingType } from '../../data/buildings';
 
 export interface BlueprintEdgeData {
   flatEdge: FlatEdge;
@@ -20,6 +24,17 @@ export interface BlueprintEdgeData {
   maxRate: number;
   isDark: boolean;
   isDimmed?: boolean;
+  sourceBuildingCount: Rational | null;
+  /** Total rate produced by the source node (for computing per-edge building share) */
+  sourceTotalRate: Rational | null;
+  /** Building type of the source node (e.g. 'extractor') */
+  sourceBuildingType: string | null;
+  /** Building name of the source node (e.g. 'Extractor') */
+  sourceBuildingName: string | null;
+  /** Whether the source node is a raw resource */
+  sourceIsRaw: boolean;
+  /** Where along the edge (0–1) the bend occurs; 0.5 = centered (default) */
+  stepPosition: number;
   [key: string]: unknown;
 }
 
@@ -56,10 +71,15 @@ export const BlueprintEdge = memo(function BlueprintEdge({
 
   if (!data) return null;
 
-  const { flatEdge, beltStatus, beltsNeeded, utilization, maxRate, isDark, isDimmed } = data;
+  const { flatEdge, beltStatus, beltsNeeded, utilization, maxRate, isDark, isDimmed, sourceBuildingCount, sourceTotalRate, sourceBuildingType, sourceBuildingName, sourceIsRaw, stepPosition } = data;
   const rate = flatEdge.rate.toNumber();
   const itemColor = getItemColor(flatEdge.fromItemId);
   const statusColor = STATUS_COLORS[beltStatus];
+
+  // Compute per-edge building share (e.g. "12 of 34 extractors feed this line")
+  const buildingShare = sourceBuildingCount && sourceTotalRate && !sourceTotalRate.isZero()
+    ? sourceBuildingCount.multiply(flatEdge.rate).divide(sourceTotalRate)
+    : null;
 
   // Throughput-scaled stroke width
   const relativeWidth = maxRate > 0 ? rate / maxRate : 0.5;
@@ -73,6 +93,7 @@ export const BlueprintEdge = memo(function BlueprintEdge({
     sourcePosition,
     targetPosition,
     borderRadius: 8,
+    stepPosition,
   });
 
   const edgeOpacity = isDimmed ? 0.15 : 0.85;
@@ -108,8 +129,6 @@ export const BlueprintEdge = memo(function BlueprintEdge({
   const beltLabel = beltStatus === 'multi-belt'
     ? `\u00D7${beltsNeeded}`
     : `${utilizationPct}%`;
-
-  const tooltipText = `${beltsNeeded} belt${beltsNeeded > 1 ? 's' : ''} \u00B7 ${utilizationPct}%`;
 
   const labelClass = isDark ? 'text-gray-400' : 'text-gray-500';
   const dividerClass = isDark ? 'border-gray-600' : 'border-gray-200';
@@ -156,10 +175,49 @@ export const BlueprintEdge = memo(function BlueprintEdge({
     );
   }
 
-  // Full zoom: complete render with belt popover
+  // Full zoom: complete render with popover on rate pill
+  const distribution =
+    beltStatus === 'multi-belt' && sourceBuildingCount
+      ? getBeltDistribution(sourceBuildingCount, beltsNeeded)
+      : null;
+
+  // Format building share for display
+  const shareValue = buildingShare ? buildingShare.toNumber() : null;
+  const shareText = shareValue !== null
+    ? (buildingShare!.isInteger() || Math.abs(shareValue - Math.round(shareValue)) < 0.001
+      ? Math.round(shareValue).toString()
+      : shareValue.toFixed(2))
+    : null;
+  const totalBuildingText = sourceBuildingCount
+    ? (sourceBuildingCount.isInteger() || Math.abs(sourceBuildingCount.toNumber() - Math.round(sourceBuildingCount.toNumber())) < 0.001
+      ? Math.round(sourceBuildingCount.toNumber()).toString()
+      : sourceBuildingCount.toNumber().toFixed(2))
+    : null;
+
   const popoverContent = (
     <div className="space-y-1.5">
-      <div className="font-semibold text-sm mb-2">Belt Details</div>
+      <div className="font-semibold text-sm mb-2">{flatEdge.itemName}</div>
+      <div className="flex justify-between">
+        <span className={labelClass}>Throughput</span>
+        <span className="font-medium">{formatRate(rate)}/min</span>
+      </div>
+      {shareText && sourceBuildingName && (
+        <>
+          <div className={`border-t my-2 ${dividerClass}`} />
+          <div className="flex justify-between items-center">
+            <span className={labelClass}>
+              {sourceIsRaw ? 'Extractors' : sourceBuildingName + 's'}
+            </span>
+            <span className="font-medium flex items-center gap-1">
+              {sourceBuildingType && (
+                <BuildingIcon buildingType={sourceBuildingType as BuildingType} size="sm" />
+              )}
+              {shareText} of {totalBuildingText}
+            </span>
+          </div>
+        </>
+      )}
+      <div className={`border-t my-2 ${dividerClass}`} />
       <div className="flex justify-between">
         <span className={labelClass}>Belts needed</span>
         <span className="font-medium">{beltsNeeded}</span>
@@ -168,19 +226,37 @@ export const BlueprintEdge = memo(function BlueprintEdge({
         <span className={labelClass}>Utilization</span>
         <span className="font-medium">{utilizationPct}%</span>
       </div>
-      <div className="flex justify-between">
-        <span className={labelClass}>Throughput</span>
-        <span className="font-medium">{formatRate(rate)}/min</span>
-      </div>
-      <div className={`border-t my-2 ${dividerClass}`} />
-      <div className="flex justify-between">
-        <span className={labelClass}>Status</span>
-        <span className="font-medium" style={{ color: statusColor }}>
-          {beltStatus === 'multi-belt' ? 'Multi-belt' : 'Near capacity'}
-        </span>
-      </div>
+      {beltStatus !== 'ok' && (
+        <>
+          <div className={`border-t my-2 ${dividerClass}`} />
+          <div className="flex justify-between">
+            <span className={labelClass}>Status</span>
+            <span className="font-medium" style={{ color: statusColor }}>
+              {beltStatus === 'multi-belt' ? 'Multi-belt' : 'Near capacity'}
+            </span>
+          </div>
+        </>
+      )}
+      {distribution && (
+        <>
+          <div className={`border-t my-2 ${dividerClass}`} />
+          <div className={`${labelClass} mb-1`}>Distribution per belt</div>
+          <div className="font-medium">{distribution.shortLabel}</div>
+          {distribution.splitInfo && (
+            <div className={`${labelClass} text-[11px]`}>
+              {distribution.splitInfo.fullBuildings} full + {distribution.splitInfo.splitNumerator}/{distribution.splitInfo.splitDenominator} split
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
+
+  const tooltipParts = [`${beltsNeeded} belt${beltsNeeded > 1 ? 's' : ''}`, `${utilizationPct}%`];
+  if (shareText && sourceBuildingName) {
+    tooltipParts.push(`${shareText} ${sourceIsRaw ? 'extractors' : sourceBuildingName.toLowerCase() + 's'}`);
+  }
+  const fullTooltipText = tooltipParts.join(' \u00B7 ');
 
   return (
     <>
@@ -208,27 +284,31 @@ export const BlueprintEdge = memo(function BlueprintEdge({
       />
       <EdgeLabelRenderer>
         <div
-          className={`absolute flex items-center gap-0.5 text-[10px] ${pillBg} ${pillText} border ${pillBorder} rounded px-1.5 py-0.5 leading-tight ${showBeltIndicator ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          className="absolute pointer-events-auto"
           style={{
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            ...(pillBorderStyle ? { borderColor: pillBorderStyle } : {}),
             opacity: isDimmed ? 0.25 : 1,
             transition: 'opacity 0.2s',
           }}
         >
-          {rateText}
-          {showBeltIndicator && (
-            <BadgePopover
-              isDark={isDark}
-              tooltipContent={tooltipText}
-              popoverContent={popoverContent}
+          <BadgePopover
+            isDark={isDark}
+            tooltipContent={fullTooltipText}
+            popoverContent={popoverContent}
+          >
+            <span
+              className={`inline-flex items-center gap-0.5 text-[10px] ${pillBg} ${pillText} border ${pillBorder} rounded px-1.5 py-0.5 leading-tight cursor-pointer`}
+              style={pillBorderStyle ? { borderColor: pillBorderStyle } : undefined}
             >
-              <span className="inline-flex items-center gap-0.5 cursor-pointer">
-                <BeltIcon size={10} color={statusColor} />
-                <span style={{ color: statusColor }}>{beltLabel}</span>
-              </span>
-            </BadgePopover>
-          )}
+              {rateText}
+              {showBeltIndicator && (
+                <>
+                  <BeltIcon size={10} color={statusColor} />
+                  <span style={{ color: statusColor }}>{beltLabel}</span>
+                </>
+              )}
+            </span>
+          </BadgePopover>
         </div>
       </EdgeLabelRenderer>
     </>

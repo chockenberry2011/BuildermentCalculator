@@ -99,6 +99,9 @@ interface CalculatorState {
   blueprintOrientation: BlueprintOrientation;
   collapsedSections: Record<string, boolean>;
 
+  // Blueprint progress tracking (itemId → completed)
+  blueprintProgress: Map<string, boolean>;
+
   // Feature 1: Clean rates filter
   cleanRatesOnly: boolean;
 
@@ -142,6 +145,8 @@ interface CalculatorState {
   setRateFromItemBuildingCount: (itemId: string, count: number) => void;
   setRateFromResourceAmount: (resourceId: string, ratePerMinute: number) => void;
   setRateFromExtractorCount: (resourceId: string, extractorCount: number) => void;
+  toggleBlueprintProgress: (itemId: string) => void;
+  clearBlueprintProgress: () => void;
   resetCalculator: () => void;
   toggleSection: (sectionId: string) => void;
   addTarget: () => void;
@@ -196,6 +201,7 @@ export const useStore = create<CalculatorState>()(
       optimizationDetailLevel: 'standard',
       blueprintOrientation: 'horizontal' as BlueprintOrientation,
       collapsedSections: {},
+      blueprintProgress: new Map(),
       cleanRatesOnly: false,
       autoIntegerMode: false,
       fractionalProposals: [],
@@ -422,6 +428,20 @@ export const useStore = create<CalculatorState>()(
         get().recalculate();
       },
 
+      toggleBlueprintProgress: (itemId) => {
+        const progress = new Map(get().blueprintProgress);
+        if (progress.get(itemId)) {
+          progress.delete(itemId);
+        } else {
+          progress.set(itemId, true);
+        }
+        set({ blueprintProgress: progress });
+      },
+
+      clearBlueprintProgress: () => {
+        set({ blueprintProgress: new Map() });
+      },
+
       resetCalculator: () => {
         set({
           targetItemId: 'wood_plank',
@@ -591,12 +611,15 @@ export const useStore = create<CalculatorState>()(
         autoIntegerMode: state.autoIntegerMode,
         resourceConstraints: state.resourceConstraints,
         collapsedSections: state.collapsedSections,
+        blueprintProgress: mapToObject(state.blueprintProgress),
       }),
       onRehydrateStorage: () => (state, error) => {
         if (state) {
           // Convert persisted objects back to Maps
           state.recipeSelections = objectToMap(state.recipeSelections as unknown as Record<string, string>);
           state.buildingLevels = objectToMap(state.buildingLevels as unknown as Record<BuildingType, number>);
+
+          state.blueprintProgress = objectToMap(state.blueprintProgress as unknown as Record<string, boolean>);
 
           // Migrate persisted 'graph' viewMode to 'blueprint'
           if ((state.viewMode as string) === 'graph') {
