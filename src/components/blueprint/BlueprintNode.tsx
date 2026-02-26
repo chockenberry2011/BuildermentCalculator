@@ -12,6 +12,7 @@ import { SplitBadge } from '../SplitBadge';
 export interface BlueprintNodeData {
   flatNode: FlatNode;
   inputItemIds: string[];
+  outputItemIds: string[];
   isDark: boolean;
   isRoot: boolean;
   [key: string]: unknown;
@@ -35,7 +36,7 @@ function formatRate(rate: Rational): string {
 }
 
 export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
-  const { flatNode, inputItemIds, isDark, isRoot } = data as BlueprintNodeData;
+  const { flatNode, inputItemIds, outputItemIds, isDark, isRoot } = data as BlueprintNodeData;
   const building = flatNode.building;
   const buildingType = building?.buildingType ?? 'workshop';
   const accentColor = getItemColor(flatNode.itemId);
@@ -106,19 +107,22 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
         />
       ))}
 
-      {/* Output handle (right side) */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id={flatNode.itemId}
-        style={{
-          top: '50%',
-          background: accentColor,
-          width: 8,
-          height: 8,
-          border: `2px solid ${isDark ? '#1F2937' : '#F3F4F6'}`,
-        }}
-      />
+      {/* Output handles (right side) — one per consumer */}
+      {outputItemIds.map((consumerId, i) => (
+        <Handle
+          key={`source-${consumerId}`}
+          type="source"
+          position={Position.Right}
+          id={`out-${consumerId}`}
+          style={{
+            top: `${((i + 1) / (outputItemIds.length + 1)) * 100}%`,
+            background: accentColor,
+            width: 8,
+            height: 8,
+            border: `2px solid ${isDark ? '#1F2937' : '#F3F4F6'}`,
+          }}
+        />
+      ))}
     </div>
   );
 });

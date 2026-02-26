@@ -189,12 +189,49 @@ export function layoutDAG(dag: FlatDAG): Map<string, { x: number; y: number }> {
     }
   }
 
-  // Group nodes by rank
-  const rankGroups = new Map<number, FlatNode[]>();
+  // Insert dummy nodes for long-span edges so barycenter considers them
+  interface LayoutItem { itemId: string }
+  const dummyIds = new Set<string>();
+
+  for (const edge of dag.edges) {
+    const fromRank = ranks.get(edge.fromItemId) ?? 0;
+    const toRank = ranks.get(edge.toItemId) ?? 0;
+    const span = toRank - fromRank;
+    if (span >= 2) {
+      let prevId = edge.fromItemId;
+      for (let r = fromRank + 1; r < toRank; r++) {
+        const dummyId = `__dummy_${edge.fromItemId}_${edge.toItemId}_${r}`;
+        dummyIds.add(dummyId);
+        ranks.set(dummyId, r);
+        // Wire dummy into adjacency so barycenter sees it
+        inputsOf.set(dummyId, [prevId]);
+        const prevOutputs = outputsOf.get(prevId) ?? [];
+        prevOutputs.push(dummyId);
+        outputsOf.set(prevId, prevOutputs);
+        outputsOf.set(dummyId, []);
+        prevId = dummyId;
+      }
+      // Connect last dummy to the real consumer
+      const lastDummyOutputs = outputsOf.get(prevId) ?? [];
+      lastDummyOutputs.push(edge.toItemId);
+      outputsOf.set(prevId, lastDummyOutputs);
+      const consumerInputs = inputsOf.get(edge.toItemId) ?? [];
+      consumerInputs.push(prevId);
+      inputsOf.set(edge.toItemId, consumerInputs);
+    }
+  }
+
+  // Group nodes by rank (including dummies)
+  const rankGroups = new Map<number, LayoutItem[]>();
   for (const node of dag.nodes) {
     const rank = ranks.get(node.itemId) ?? 0;
     if (!rankGroups.has(rank)) rankGroups.set(rank, []);
     rankGroups.get(rank)!.push(node);
+  }
+  for (const dummyId of dummyIds) {
+    const rank = ranks.get(dummyId) ?? 0;
+    if (!rankGroups.has(rank)) rankGroups.set(rank, []);
+    rankGroups.get(rank)!.push({ itemId: dummyId });
   }
 
   // DFS order from sinks — gives each branch its own vertical lane (git-history style)
@@ -220,62 +257,90 @@ export function layoutDAG(dag: FlatDAG): Map<string, { x: number; y: number }> {
   for (const node of dag.nodes) {
     dfsForOrder(node.itemId);
   }
+  for (const dummyId of dummyIds) {
+    dfsForOrder(dummyId);
+  }
+
+  // Dynamic ySpacing based on column density
+  const xSpacing = 280;
+  let maxNodesInRank = 0;
+  for (const [, items] of rankGroups) {
+    maxNodesInRank = Math.max(maxNodesInRank, items.length);
+  }
+  const ySpacing = Math.max(130, maxNodesInRank * 20 + 70);
 
   // Initial Y positions: order within each rank by DFS discovery order
-  const xSpacing = 280;
-  const ySpacing = 130;
-
-  for (const [rank, nodes] of rankGroups) {
-    nodes.sort((a, b) => (dfsOrder.get(a.itemId) ?? 0) - (dfsOrder.get(b.itemId) ?? 0));
-    for (let i = 0; i < nodes.length; i++) {
-      const stagger = (i - (nodes.length - 1) / 2) * 30;
-      const x = rank * xSpacing + stagger;
-      const y = (i - (nodes.length - 1) / 2) * ySpacing;
-      positions.set(nodes[i].itemId, { x, y });
+  for (const [rank, items] of rankGroups) {
+    items.sort((a, b) => (dfsOrder.get(a.itemId) ?? 0) - (dfsOrder.get(b.itemId) ?? 0));
+    for (let i = 0; i < items.length; i++) {
+      const x = rank * xSpacing;
+      const y = (i - (items.length - 1) / 2) * ySpacing;
+      positions.set(items[i].itemId, { x, y });
     }
   }
 
   // Bidirectional barycentric passes: refine Y using both inputs and outputs
   const maxRank = Math.max(...Array.from(ranks.values()));
 
-  function reorderRank(rank: number, getNeighbors: (itemId: string) => string[]) {
-    const nodes = rankGroups.get(rank);
-    if (!nodes) return;
+  function reorderRank(rank: number, getNeighbors: (itemId: string) => string[]): boolean {
+    const items = rankGroups.get(rank);
+    if (!items || items.length < 2) return false;
 
-    const barycenters: { node: FlatNode; y: number }[] = [];
-    for (const node of nodes) {
-      const neighbors = getNeighbors(node.itemId);
+    // Snapshot order before sort
+    const orderBefore = items.map(item => item.itemId);
+
+    const barycenters: { item: LayoutItem; y: number }[] = [];
+    for (const item of items) {
+      const neighbors = getNeighbors(item.itemId);
       if (neighbors.length > 0) {
         let sumY = 0;
         for (const nId of neighbors) {
           sumY += positions.get(nId)?.y ?? 0;
         }
-        barycenters.push({ node, y: sumY / neighbors.length });
+        barycenters.push({ item, y: sumY / neighbors.length });
       } else {
-        barycenters.push({ node, y: positions.get(node.itemId)?.y ?? 0 });
+        barycenters.push({ item, y: positions.get(item.itemId)?.y ?? 0 });
       }
     }
 
     barycenters.sort((a, b) => a.y - b.y);
     const centerOffset = (barycenters.length - 1) / 2;
     for (let i = 0; i < barycenters.length; i++) {
-      const stagger = (i - centerOffset) * 30;
-      positions.set(barycenters[i].node.itemId, {
-        x: rank * xSpacing + stagger,
+      positions.set(barycenters[i].item.itemId, {
+        x: rank * xSpacing,
         y: (i - centerOffset) * ySpacing,
       });
     }
+
+    // Update rankGroups order to match sorted result
+    items.length = 0;
+    for (const bc of barycenters) {
+      items.push(bc.item);
+    }
+
+    // Check if order changed
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].itemId !== orderBefore[i]) return true;
+    }
+    return false;
   }
 
-  for (let iter = 0; iter < 2; iter++) {
+  for (let iter = 0; iter < 24; iter++) {
+    let changed = false;
     // Forward pass: order by input positions
     for (let rank = 1; rank <= maxRank; rank++) {
-      reorderRank(rank, (id) => inputsOf.get(id) ?? []);
+      if (reorderRank(rank, (id) => inputsOf.get(id) ?? [])) changed = true;
     }
     // Backward pass: order by output/consumer positions
     for (let rank = maxRank - 1; rank >= 0; rank--) {
-      reorderRank(rank, (id) => outputsOf.get(id) ?? []);
+      if (reorderRank(rank, (id) => outputsOf.get(id) ?? [])) changed = true;
     }
+    if (!changed) break;
+  }
+
+  // Remove dummy nodes from output positions
+  for (const dummyId of dummyIds) {
+    positions.delete(dummyId);
   }
 
   return positions;

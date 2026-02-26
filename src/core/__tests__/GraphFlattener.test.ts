@@ -122,4 +122,41 @@ describe('layoutDAG', () => {
     // And that rank should be exactly one less than the product
     expect(gearRank).toBe(motorRank - 1);
   });
+
+  it('does not include dummy nodes in layout output', () => {
+    const result = calculateProduction('turbocharger', 1, noRecipes, defaultLevels);
+    const dag = flattenToDAG(result);
+    const positions = layoutDAG(dag);
+
+    // No position keys should start with __dummy_
+    for (const key of positions.keys()) {
+      expect(key.startsWith('__dummy_')).toBe(false);
+    }
+
+    // Every position should correspond to a real DAG node
+    const dagNodeIds = new Set(dag.nodes.map((n) => n.itemId));
+    for (const key of positions.keys()) {
+      expect(dagNodeIds.has(key)).toBe(true);
+    }
+  });
+
+  it('nodes within the same rank share the same x position (no stagger)', () => {
+    const result = calculateProduction('turbocharger', 1, noRecipes, defaultLevels);
+    const dag = flattenToDAG(result);
+    const positions = layoutDAG(dag);
+
+    // Group positions by rank (x / 280)
+    const xSpacing = 280;
+    const rankXValues = new Map<number, Set<number>>();
+    for (const pos of positions.values()) {
+      const rank = Math.round(pos.x / xSpacing);
+      if (!rankXValues.has(rank)) rankXValues.set(rank, new Set());
+      rankXValues.get(rank)!.add(pos.x);
+    }
+
+    // Each rank should have exactly one unique x value
+    for (const [, xValues] of rankXValues) {
+      expect(xValues.size).toBe(1);
+    }
+  });
 });

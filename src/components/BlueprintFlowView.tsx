@@ -28,12 +28,17 @@ function buildReactFlowData(
   rootItemId: string,
   rootItemIds?: Set<string>,
 ): { rfNodes: Node[]; rfEdges: Edge[] } {
-  // Build a map of which items are inputs to which nodes (for handle placement)
+  // Build maps of which items are inputs/outputs to which nodes (for handle placement)
   const inputsOf = new Map<string, string[]>();
+  const outputsOf = new Map<string, string[]>();
   for (const edge of dag.edges) {
-    const existing = inputsOf.get(edge.toItemId) ?? [];
-    existing.push(edge.fromItemId);
-    inputsOf.set(edge.toItemId, existing);
+    const existingInputs = inputsOf.get(edge.toItemId) ?? [];
+    existingInputs.push(edge.fromItemId);
+    inputsOf.set(edge.toItemId, existingInputs);
+
+    const existingOutputs = outputsOf.get(edge.fromItemId) ?? [];
+    existingOutputs.push(edge.toItemId);
+    outputsOf.set(edge.fromItemId, existingOutputs);
   }
 
   // Find max edge rate for relative width scaling
@@ -45,6 +50,7 @@ function buildReactFlowData(
   const rfNodes: Node[] = dag.nodes.map((flatNode) => {
     const pos = positions.get(flatNode.itemId) ?? { x: 0, y: 0 };
     const nodeInputs = inputsOf.get(flatNode.itemId) ?? [];
+    const nodeOutputs = outputsOf.get(flatNode.itemId) ?? [];
 
     return {
       id: flatNode.itemId,
@@ -53,6 +59,7 @@ function buildReactFlowData(
       data: {
         flatNode,
         inputItemIds: nodeInputs,
+        outputItemIds: nodeOutputs,
         isDark,
         isRoot: rootItemIds ? rootItemIds.has(flatNode.itemId) : flatNode.itemId === rootItemId,
       } satisfies BlueprintNodeData,
@@ -69,7 +76,7 @@ function buildReactFlowData(
       id: `${flatEdge.fromItemId}->${flatEdge.toItemId}`,
       source: flatEdge.fromItemId,
       target: flatEdge.toItemId,
-      sourceHandle: flatEdge.fromItemId,
+      sourceHandle: `out-${flatEdge.toItemId}`,
       targetHandle: flatEdge.fromItemId,
       type: 'belt',
       data: {
@@ -147,6 +154,15 @@ export function BlueprintFlowView() {
     [],
   );
 
+  // Derive height from actual layout positions
+  const estimatedHeight = useMemo(() => {
+    if (initialNodes.length === 0) return 500;
+    const ys = initialNodes.map((n) => n.position.y);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    return Math.max(500, maxY - minY + 300);
+  }, [initialNodes]);
+
   if (!productionResult) {
     return (
       <div
@@ -158,9 +174,6 @@ export function BlueprintFlowView() {
       </div>
     );
   }
-
-  // Estimate height from DAG depth: base 300px + 120px per layer, min 400px
-  const estimatedHeight = Math.max(400, 300 + initialNodes.length * 40);
 
   return (
     <div
