@@ -68,9 +68,12 @@ function AppContent() {
           <div>
             <h1 className={`text-xl sm:text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
               Builderment Resource Calculator
+              <span className="ml-2 align-middle text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400 border border-amber-500/30 dark:border-amber-400/30" title="Under active development — things may change or break">
+                BETA
+              </span>
             </h1>
             <p className={`hidden sm:block text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Map out your entire production chain
+              Map out your entire production chain — under active development
             </p>
           </div>
           <div className="flex items-center gap-3">
