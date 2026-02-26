@@ -94,4 +94,32 @@ describe('layoutDAG', () => {
     const positions = layoutDAG({ nodes: [], edges: [] });
     expect(positions.size).toBe(0);
   });
+
+  it('places all direct inputs in the column immediately before the product (sink-aligned)', () => {
+    const result = calculateProduction('electric_motor', 7.5, noRecipes, defaultLevels);
+    const dag = flattenToDAG(result);
+    const positions = layoutDAG(dag);
+
+    const motorPos = positions.get('electric_motor')!;
+    const ironGearPos = positions.get('iron_gear')!;
+    const rotorPos = positions.get('rotor')!;
+    const batteryPos = positions.get('battery')!;
+
+    // Extract rank (column) from x position — all same-rank nodes share the same base x
+    // Ranks are spaced 280px apart, so dividing by spacing and rounding gives the rank
+    const xSpacing = 280;
+    const getRank = (pos: { x: number }) => Math.round(pos.x / xSpacing);
+
+    const motorRank = getRank(motorPos);
+    const gearRank = getRank(ironGearPos);
+    const rotorRank = getRank(rotorPos);
+    const batteryRank = getRank(batteryPos);
+
+    // All three direct inputs should be at the same rank
+    expect(gearRank).toBe(rotorRank);
+    expect(gearRank).toBe(batteryRank);
+
+    // And that rank should be exactly one less than the product
+    expect(gearRank).toBe(motorRank - 1);
+  });
 });

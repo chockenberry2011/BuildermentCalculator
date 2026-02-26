@@ -124,31 +124,69 @@ export function layoutDAG(dag: FlatDAG): Map<string, { x: number; y: number }> {
     outputsOf.get(edge.fromItemId)?.push(edge.toItemId);
   }
 
-  // Topological rank: raw/leaf nodes get rank 0, others get max(input ranks) + 1
-  const ranks = new Map<string, number>();
+  // Pass 1: Forward ranks — raw/leaf nodes get rank 0, others get max(input ranks) + 1
+  const forwardRanks = new Map<string, number>();
 
-  function computeRank(itemId: string, visited: Set<string>): number {
-    if (ranks.has(itemId)) return ranks.get(itemId)!;
+  function computeForwardRank(itemId: string, visited: Set<string>): number {
+    if (forwardRanks.has(itemId)) return forwardRanks.get(itemId)!;
     if (visited.has(itemId)) return 0; // cycle guard
     visited.add(itemId);
 
     const inputs = inputsOf.get(itemId) ?? [];
     if (inputs.length === 0) {
-      ranks.set(itemId, 0);
+      forwardRanks.set(itemId, 0);
       return 0;
     }
 
     let maxInputRank = 0;
     for (const inputId of inputs) {
-      maxInputRank = Math.max(maxInputRank, computeRank(inputId, visited));
+      maxInputRank = Math.max(maxInputRank, computeForwardRank(inputId, visited));
     }
     const rank = maxInputRank + 1;
+    forwardRanks.set(itemId, rank);
+    return rank;
+  }
+
+  for (const node of dag.nodes) {
+    computeForwardRank(node.itemId, new Set());
+  }
+
+  // Pass 2: Sink-aligned ranks — pull nodes rightward toward their consumers
+  // Sinks (no consumers) keep their forward rank. Others get min(consumer ranks) - 1.
+  const ranks = new Map<string, number>();
+
+  function computeSinkRank(itemId: string, visited: Set<string>): number {
+    if (ranks.has(itemId)) return ranks.get(itemId)!;
+    if (visited.has(itemId)) return forwardRanks.get(itemId) ?? 0; // cycle guard
+    visited.add(itemId);
+
+    const consumers = outputsOf.get(itemId) ?? [];
+    if (consumers.length === 0) {
+      // Sink node: keep forward rank
+      const rank = forwardRanks.get(itemId) ?? 0;
+      ranks.set(itemId, rank);
+      return rank;
+    }
+
+    let minConsumerRank = Infinity;
+    for (const consumerId of consumers) {
+      minConsumerRank = Math.min(minConsumerRank, computeSinkRank(consumerId, visited));
+    }
+    const rank = minConsumerRank - 1;
     ranks.set(itemId, rank);
     return rank;
   }
 
   for (const node of dag.nodes) {
-    computeRank(node.itemId, new Set());
+    computeSinkRank(node.itemId, new Set());
+  }
+
+  // Normalize ranks so the minimum is 0
+  const minRank = Math.min(...Array.from(ranks.values()));
+  if (minRank !== 0) {
+    for (const [itemId, rank] of ranks) {
+      ranks.set(itemId, rank - minRank);
+    }
   }
 
   // Group nodes by rank
@@ -159,52 +197,84 @@ export function layoutDAG(dag: FlatDAG): Map<string, { x: number; y: number }> {
     rankGroups.get(rank)!.push(node);
   }
 
-  // Initial Y positions: spread within each rank
+  // DFS order from sinks — gives each branch its own vertical lane (git-history style)
+  const dfsOrder = new Map<string, number>();
+  let orderCounter = 0;
+
+  function dfsForOrder(itemId: string) {
+    if (dfsOrder.has(itemId)) return;
+    dfsOrder.set(itemId, orderCounter++);
+    // Visit inputs sorted by forward rank (shallowest/simplest branches first)
+    const inputs = [...(inputsOf.get(itemId) ?? [])];
+    inputs.sort((a, b) => (forwardRanks.get(a) ?? 0) - (forwardRanks.get(b) ?? 0));
+    for (const inputId of inputs) {
+      dfsForOrder(inputId);
+    }
+  }
+
+  // Start DFS from sinks (no consumers)
+  const sinks = dag.nodes.filter(n => (outputsOf.get(n.itemId) ?? []).length === 0);
+  for (const sink of sinks) {
+    dfsForOrder(sink.itemId);
+  }
+  for (const node of dag.nodes) {
+    dfsForOrder(node.itemId);
+  }
+
+  // Initial Y positions: order within each rank by DFS discovery order
   const xSpacing = 280;
   const ySpacing = 130;
 
   for (const [rank, nodes] of rankGroups) {
-    // Sort by total throughput (largest centered)
-    nodes.sort((a, b) => b.totalRate.toNumber() - a.totalRate.toNumber());
+    nodes.sort((a, b) => (dfsOrder.get(a.itemId) ?? 0) - (dfsOrder.get(b.itemId) ?? 0));
     for (let i = 0; i < nodes.length; i++) {
-      const stagger = (i - (nodes.length - 1) / 2) * 30; // ±30px offset from center
+      const stagger = (i - (nodes.length - 1) / 2) * 30;
       const x = rank * xSpacing + stagger;
       const y = (i - (nodes.length - 1) / 2) * ySpacing;
       positions.set(nodes[i].itemId, { x, y });
     }
   }
 
-  // Barycentric pass: adjust Y to average of input positions, then re-space
+  // Bidirectional barycentric passes: refine Y using both inputs and outputs
   const maxRank = Math.max(...Array.from(ranks.values()));
-  for (let rank = 1; rank <= maxRank; rank++) {
-    const nodes = rankGroups.get(rank);
-    if (!nodes) continue;
 
-    // Compute barycentric Y for each node
+  function reorderRank(rank: number, getNeighbors: (itemId: string) => string[]) {
+    const nodes = rankGroups.get(rank);
+    if (!nodes) return;
+
     const barycenters: { node: FlatNode; y: number }[] = [];
     for (const node of nodes) {
-      const inputs = inputsOf.get(node.itemId) ?? [];
-      if (inputs.length > 0) {
+      const neighbors = getNeighbors(node.itemId);
+      if (neighbors.length > 0) {
         let sumY = 0;
-        for (const inputId of inputs) {
-          sumY += positions.get(inputId)?.y ?? 0;
+        for (const nId of neighbors) {
+          sumY += positions.get(nId)?.y ?? 0;
         }
-        barycenters.push({ node, y: sumY / inputs.length });
+        barycenters.push({ node, y: sumY / neighbors.length });
       } else {
         barycenters.push({ node, y: positions.get(node.itemId)?.y ?? 0 });
       }
     }
 
-    // Sort by barycentric Y and re-space to avoid overlap
     barycenters.sort((a, b) => a.y - b.y);
     const centerOffset = (barycenters.length - 1) / 2;
     for (let i = 0; i < barycenters.length; i++) {
       const stagger = (i - centerOffset) * 30;
-      const targetY = (i - centerOffset) * ySpacing;
       positions.set(barycenters[i].node.itemId, {
         x: rank * xSpacing + stagger,
-        y: targetY,
+        y: (i - centerOffset) * ySpacing,
       });
+    }
+  }
+
+  for (let iter = 0; iter < 2; iter++) {
+    // Forward pass: order by input positions
+    for (let rank = 1; rank <= maxRank; rank++) {
+      reorderRank(rank, (id) => inputsOf.get(id) ?? []);
+    }
+    // Backward pass: order by output/consumer positions
+    for (let rank = maxRank - 1; rank >= 0; rank--) {
+      reorderRank(rank, (id) => outputsOf.get(id) ?? []);
     }
   }
 
