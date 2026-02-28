@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { gcd, lcm, gcdMultiple, lcmMultiple, isEffectivelyInteger, isPowerOf2, nearestPowerOf2 } from '../gcd';
+import { gcd, lcm, gcdMultiple, lcmMultiple, isEffectivelyInteger, isPowerOf2, isSplitterFriendlyRatio, isSimpleSplitterRatio, nearestPowerOf2 } from '../gcd';
 
 describe('gcd', () => {
   it('computes gcd of two numbers', () => {
@@ -82,6 +82,93 @@ describe('isPowerOf2', () => {
     expect(isPowerOf2(3)).toBe(false);
     expect(isPowerOf2(6)).toBe(false);
     expect(isPowerOf2(-4)).toBe(false);
+  });
+});
+
+describe('isSplitterFriendlyRatio', () => {
+  it('returns true for single element', () => {
+    expect(isSplitterFriendlyRatio([5])).toBe(true);
+  });
+
+  it('returns true for 1:1 (sum=2)', () => {
+    expect(isSplitterFriendlyRatio([1, 1])).toBe(true);
+  });
+
+  it('returns true for 1:3 (sum=4)', () => {
+    expect(isSplitterFriendlyRatio([1, 3])).toBe(true);
+  });
+
+  it('returns true for 3:5 (sum=8)', () => {
+    expect(isSplitterFriendlyRatio([3, 5])).toBe(true);
+  });
+
+  it('returns false for 3:4 (sum=7)', () => {
+    expect(isSplitterFriendlyRatio([3, 4])).toBe(false);
+  });
+
+  it('returns false for 1:1:1 (sum=3)', () => {
+    expect(isSplitterFriendlyRatio([1, 1, 1])).toBe(false);
+  });
+
+  it('returns true for 1:1:2 (sum=4)', () => {
+    expect(isSplitterFriendlyRatio([1, 1, 2])).toBe(true);
+  });
+
+  it('returns true for empty array', () => {
+    expect(isSplitterFriendlyRatio([])).toBe(true);
+  });
+});
+
+describe('isSimpleSplitterRatio', () => {
+  it('returns true for empty array', () => {
+    expect(isSimpleSplitterRatio([])).toBe(true);
+  });
+
+  it('returns true for single element', () => {
+    expect(isSimpleSplitterRatio([5])).toBe(true);
+  });
+
+  it('returns true for sum=5 (1:4)', () => {
+    expect(isSimpleSplitterRatio([1, 4])).toBe(true);
+  });
+
+  it('returns true for sum=6 (1:5)', () => {
+    expect(isSimpleSplitterRatio([1, 5])).toBe(true);
+  });
+
+  it('returns false for sum=7 (3:4)', () => {
+    expect(isSimpleSplitterRatio([3, 4])).toBe(false);
+  });
+
+  it('returns false for sum=7 (1:6)', () => {
+    expect(isSimpleSplitterRatio([1, 6])).toBe(false);
+  });
+
+  it('returns true for 1:2 (sum=3)', () => {
+    expect(isSimpleSplitterRatio([1, 2])).toBe(true);
+  });
+
+  it('returns true for 2:3 (sum=5)', () => {
+    expect(isSimpleSplitterRatio([2, 3])).toBe(true);
+  });
+
+  it('returns true for 1:1:1 (sum=3)', () => {
+    expect(isSimpleSplitterRatio([1, 1, 1])).toBe(true);
+  });
+
+  it('returns true for 1:2:3 (sum=6)', () => {
+    expect(isSimpleSplitterRatio([1, 2, 3])).toBe(true);
+  });
+
+  it('returns false for 1:3:4 (sum=8) with default threshold', () => {
+    expect(isSimpleSplitterRatio([1, 3, 4])).toBe(false);
+  });
+
+  it('respects custom maxSum threshold', () => {
+    // sum=7, maxSum=8 → true
+    expect(isSimpleSplitterRatio([3, 4], 8)).toBe(true);
+    // sum=5, maxSum=4 → false
+    expect(isSimpleSplitterRatio([2, 3], 4)).toBe(false);
   });
 });
 

@@ -15,26 +15,27 @@ import {
   type Viewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useStore, type BlueprintOrientation } from '../store/useStore';
+import { useStore, type BlueprintOrientation, type BlueprintMergeMode } from '../store/useStore';
 import { flattenToDAG, layoutDAG, type FlatDAG } from '../core/GraphFlattener';
 import { BlueprintNode, type BlueprintNodeData } from './blueprint/BlueprintNode';
 import { BlueprintEdge, type BlueprintEdgeData } from './blueprint/BlueprintEdge';
 import { BlueprintSearch } from './blueprint/BlueprintSearch';
-import { BlueprintLegend } from './blueprint/BlueprintLegend';
+import { useZoomLevel } from '../hooks/useZoomLevel';
 import { getItemColor } from '../data/itemColors';
 import { BUILDINGS } from '../data/buildings';
 import { classifyBeltStatus, getBeltsNeeded, getBeltUtilization } from '../data/belts';
+import { buildSplitterTree, ratesToParts, type SplitterTreeInfo } from '../core/splitterTree';
 
 const nodeTypes = { blueprint: BlueprintNode };
 const edgeTypes = { belt: BlueprintEdge };
 
 /** Adjacency maps for the current DAG — used for highlighting and keyboard nav */
 interface AdjacencyMaps {
-  /** itemId → list of upstream (input) itemIds */
+  /** nodeKey → list of upstream (input) nodeKeys */
   inputsOf: Map<string, string[]>;
-  /** itemId → list of downstream (consumer) itemIds */
+  /** nodeKey → list of downstream (consumer) nodeKeys */
   outputsOf: Map<string, string[]>;
-  /** rank (x position / xSpacing) → ordered list of itemIds in that rank */
+  /** rank (x position / xSpacing) → ordered list of nodeKeys in that rank */
   rankMembers: Map<number, string[]>;
 }
 
@@ -52,13 +53,13 @@ function buildReactFlowData(
   const inputsOf = new Map<string, string[]>();
   const outputsOf = new Map<string, string[]>();
   for (const edge of dag.edges) {
-    const existingInputs = inputsOf.get(edge.toItemId) ?? [];
-    existingInputs.push(edge.fromItemId);
-    inputsOf.set(edge.toItemId, existingInputs);
+    const existingInputs = inputsOf.get(edge.toNodeKey) ?? [];
+    existingInputs.push(edge.fromNodeKey);
+    inputsOf.set(edge.toNodeKey, existingInputs);
 
-    const existingOutputs = outputsOf.get(edge.fromItemId) ?? [];
-    existingOutputs.push(edge.toItemId);
-    outputsOf.set(edge.fromItemId, existingOutputs);
+    const existingOutputs = outputsOf.get(edge.fromNodeKey) ?? [];
+    existingOutputs.push(edge.toNodeKey);
+    outputsOf.set(edge.fromNodeKey, existingOutputs);
   }
 
   // Build rank members from positions
@@ -66,12 +67,12 @@ function buildReactFlowData(
   const xSpacing = 280;
   const rankMembers = new Map<number, string[]>();
   for (const node of dag.nodes) {
-    const pos = positions.get(node.itemId);
+    const pos = positions.get(node.nodeKey);
     if (!pos) continue;
     const rankAxis = orientation === 'vertical' ? pos.y : pos.x;
     const rank = Math.round(rankAxis / xSpacing);
     if (!rankMembers.has(rank)) rankMembers.set(rank, []);
-    rankMembers.get(rank)!.push(node.itemId);
+    rankMembers.get(rank)!.push(node.nodeKey);
   }
   // Sort each rank by the cross-axis position
   for (const [, members] of rankMembers) {
@@ -90,13 +91,12 @@ function buildReactFlowData(
   );
 
   const rfNodes: Node[] = dag.nodes.map((flatNode) => {
-    const pos = positions.get(flatNode.itemId) ?? { x: 0, y: 0 };
-    const nodeInputs = inputsOf.get(flatNode.itemId) ?? [];
-    const nodeOutputs = outputsOf.get(flatNode.itemId) ?? [];
+    const pos = positions.get(flatNode.nodeKey) ?? { x: 0, y: 0 };
+    const nodeInputs = inputsOf.get(flatNode.nodeKey) ?? [];
+    const nodeOutputs = outputsOf.get(flatNode.nodeKey) ?? [];
 
-    const itemId = flatNode.itemId;
     return {
-      id: itemId,
+      id: flatNode.nodeKey,
       type: 'blueprint',
       position: pos,
       data: {
@@ -104,10 +104,10 @@ function buildReactFlowData(
         inputItemIds: nodeInputs,
         outputItemIds: nodeOutputs,
         isDark,
-        isRoot: rootItemIds ? rootItemIds.has(itemId) : itemId === rootItemId,
+        isRoot: rootItemIds ? rootItemIds.has(flatNode.itemId) : flatNode.itemId === rootItemId,
         orientation,
-        isCompleted: blueprintProgress?.get(itemId) ?? false,
-        onToggleCompleted: toggleBlueprintProgress ? () => toggleBlueprintProgress(itemId) : undefined,
+        isCompleted: blueprintProgress?.get(flatNode.itemId) ?? false,
+        onToggleCompleted: toggleBlueprintProgress ? () => toggleBlueprintProgress(flatNode.itemId) : undefined,
       } satisfies BlueprintNodeData,
     };
   });
@@ -115,7 +115,26 @@ function buildReactFlowData(
   // Build a lookup for source node info (for belt distribution and building share)
   const nodeInfoMap = new Map<string, typeof dag.nodes[0]>();
   for (const node of dag.nodes) {
-    nodeInfoMap.set(node.itemId, node);
+    nodeInfoMap.set(node.nodeKey, node);
+  }
+
+  // Pre-pass: compute splitter tree info for multi-consumer source nodes
+  const splitterTrees = new Map<string, SplitterTreeInfo>();
+  const edgesBySource = new Map<string, typeof dag.edges>();
+  for (const edge of dag.edges) {
+    const list = edgesBySource.get(edge.fromNodeKey) ?? [];
+    list.push(edge);
+    edgesBySource.set(edge.fromNodeKey, list);
+  }
+  for (const [fromNodeKey, outEdges] of edgesBySource) {
+    if (outEdges.length < 2) continue;
+    const rates = outEdges.map((e) => e.rate.toNumber());
+    const parts = ratesToParts(rates);
+    const consumers = outEdges.map((e, i) => ({
+      label: e.toItemName,
+      parts: parts[i],
+    }));
+    splitterTrees.set(fromNodeKey, buildSplitterTree(consumers));
   }
 
   // Detect edges whose smooth-step paths would visually overlap.
@@ -126,8 +145,8 @@ function buildReactFlowData(
   const OVERLAP_THRESHOLD = 40; // px — how close midpointY must be to count as overlap
 
   const edgeInfos = dag.edges.map((edge) => {
-    const srcPos = positions.get(edge.fromItemId) ?? { x: 0, y: 0 };
-    const tgtPos = positions.get(edge.toItemId) ?? { x: 0, y: 0 };
+    const srcPos = positions.get(edge.fromNodeKey) ?? { x: 0, y: 0 };
+    const tgtPos = positions.get(edge.toNodeKey) ?? { x: 0, y: 0 };
     return {
       edge,
       midY: (srcPos.y + tgtPos.y) / 2,
@@ -168,7 +187,7 @@ function buildReactFlowData(
       // Spread stepPosition evenly from 0.3 to 0.7 across the group
       for (let g = 0; g < group.length; g++) {
         const t = group.length === 1 ? 0.5 : 0.3 + (g / (group.length - 1)) * 0.4;
-        const key = `${edgeInfos[group[g]].edge.fromItemId}->${edgeInfos[group[g]].edge.toItemId}`;
+        const key = `${edgeInfos[group[g]].edge.fromNodeKey}->${edgeInfos[group[g]].edge.toNodeKey}`;
         stepPositions.set(key, t);
       }
     }
@@ -180,16 +199,16 @@ function buildReactFlowData(
     const beltsNeeded = getBeltsNeeded(rate, beltSpeed);
     const utilization = getBeltUtilization(rate, beltSpeed);
 
-    const key = `${flatEdge.fromItemId}->${flatEdge.toItemId}`;
-    const sourceNode = nodeInfoMap.get(flatEdge.fromItemId);
+    const key = `${flatEdge.fromNodeKey}->${flatEdge.toNodeKey}`;
+    const sourceNode = nodeInfoMap.get(flatEdge.fromNodeKey);
     const srcBuilding = sourceNode?.building ?? null;
 
     return {
       id: key,
-      source: flatEdge.fromItemId,
-      target: flatEdge.toItemId,
-      sourceHandle: `out-${flatEdge.toItemId}`,
-      targetHandle: flatEdge.fromItemId,
+      source: flatEdge.fromNodeKey,
+      target: flatEdge.toNodeKey,
+      sourceHandle: `out-${flatEdge.toNodeKey}`,
+      targetHandle: flatEdge.fromNodeKey,
       type: 'belt',
       data: {
         flatEdge,
@@ -204,6 +223,7 @@ function buildReactFlowData(
         sourceBuildingName: srcBuilding ? (BUILDINGS[srcBuilding.buildingType]?.name ?? null) : null,
         sourceIsRaw: sourceNode?.isRaw ?? false,
         stepPosition: stepPositions.get(key) ?? 0.5,
+        splitterTree: splitterTrees.get(flatEdge.fromNodeKey) ?? null,
       } satisfies BlueprintEdgeData,
     };
   });
@@ -247,6 +267,124 @@ function computeHighlightedSet(
   return highlighted;
 }
 
+function BlueprintToolbar({
+  isDark,
+  orientation,
+  onToggleOrientation,
+  mergeMode,
+  onToggleMergeMode,
+  hasProgress,
+  onClearProgress,
+  legendItems,
+}: {
+  isDark: boolean;
+  orientation: BlueprintOrientation;
+  onToggleOrientation: () => void;
+  mergeMode: BlueprintMergeMode;
+  onToggleMergeMode: () => void;
+  hasProgress: boolean;
+  onClearProgress: () => void;
+  legendItems: { id: string; name: string; color: string }[];
+}) {
+  const zoomLevel = useZoomLevel();
+  const [legendCollapsed, setLegendCollapsed] = useState(false);
+
+  const showLegend = zoomLevel === 'mini' && legendItems.length > 0;
+
+  const bg = isDark ? 'bg-gray-800/95' : 'bg-white/95';
+  const border = isDark ? 'border-gray-600' : 'border-gray-300';
+  const text = isDark ? 'text-gray-300' : 'text-gray-500';
+  const textHover = isDark ? 'hover:text-gray-100 hover:bg-gray-700/60' : 'hover:text-gray-900 hover:bg-gray-100';
+  const subtext = isDark ? 'text-gray-400' : 'text-gray-500';
+  const legendText = isDark ? 'text-gray-100' : 'text-gray-900';
+
+  return (
+    <Panel position="top-left">
+      <div className={`${bg} border ${border} rounded-lg shadow-lg backdrop-blur-sm`}>
+        {/* Toolbar row */}
+        <div className="flex gap-0.5 p-1">
+          <button
+            onClick={onToggleOrientation}
+            className={`${text} ${textHover} rounded-md p-1.5 transition-colors`}
+            title={`Switch to ${orientation === 'horizontal' ? 'vertical' : 'horizontal'} layout`}
+          >
+            {orientation === 'horizontal' ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3v18" /><path d="m8 7-4 5 4 5" /><path d="m16 7 4 5-4 5" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12h18" /><path d="m7 8-5 4 5 4" /><path d="m17 8 5 4-5 4" />
+              </svg>
+            )}
+          </button>
+          <button
+            onClick={onToggleMergeMode}
+            className={`${text} ${textHover} rounded-md px-2 py-1.5 text-xs transition-colors ${mergeMode === 'dedicated' ? (isDark ? 'ring-1 ring-blue-400' : 'ring-1 ring-blue-500') : mergeMode === 'hybrid' ? (isDark ? 'ring-1 ring-amber-400' : 'ring-1 ring-amber-500') : ''}`}
+            title={mergeMode === 'merged' ? 'Merged: all shared nodes stay combined' : mergeMode === 'hybrid' ? 'Hybrid: split only complex ratios, keep simple splits merged' : 'Dedicated: split all non-power-of-2 ratios'}
+          >
+            {mergeMode === 'merged' ? 'Merged' : mergeMode === 'hybrid' ? 'Hybrid' : 'Dedicated'}
+          </button>
+          {hasProgress && (
+            <button
+              onClick={onClearProgress}
+              className={`${text} ${textHover} rounded-md px-2 py-1.5 text-xs transition-colors`}
+              title="Reset progress"
+            >
+              Reset &#x2713;
+            </button>
+          )}
+        </div>
+        {/* Legend section — only at mini zoom */}
+        {showLegend && (
+          <>
+            <div className={`border-t ${border}`} />
+            <button
+              onClick={() => setLegendCollapsed((v) => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 w-full text-left text-xs font-medium ${legendText}`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={subtext}
+                style={{ transform: legendCollapsed ? 'rotate(-90deg)' : undefined, transition: 'transform 0.15s' }}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+              Legend
+              <span className={`${subtext} font-normal`}>({legendItems.length})</span>
+            </button>
+            {!legendCollapsed && (
+              <div className={`px-2.5 pb-2 max-h-48 overflow-y-auto border-t ${border}`}>
+                <div className="grid gap-0.5 pt-1.5">
+                  {legendItems.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2">
+                      <span
+                        className="shrink-0 rounded-full"
+                        style={{ width: 10, height: 10, backgroundColor: item.color }}
+                      />
+                      <span className={`text-[11px] ${legendText} truncate`}>
+                        {item.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
 function BlueprintFlowInner({
   initialNodes,
   initialEdges,
@@ -258,8 +396,11 @@ function BlueprintFlowInner({
   onViewportChange,
   orientation,
   onToggleOrientation,
+  mergeMode,
+  onToggleMergeMode,
   hasProgress,
   onClearProgress,
+  onNodePositionChange,
 }: {
   initialNodes: Node[];
   initialEdges: Edge[];
@@ -271,8 +412,11 @@ function BlueprintFlowInner({
   onViewportChange: (viewport: Viewport) => void;
   orientation: BlueprintOrientation;
   onToggleOrientation: () => void;
+  mergeMode: BlueprintMergeMode;
+  onToggleMergeMode: () => void;
   hasProgress: boolean;
   onClearProgress: () => void;
+  onNodePositionChange: (nodeKey: string, position: { x: number; y: number }) => void;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -285,11 +429,25 @@ function BlueprintFlowInner({
     onEnd: onViewportChange,
   });
 
-  // Sync when production result changes
-  useMemo(() => {
+  // Sync when production result changes, then fit to view if no saved viewport
+  const shouldFitRef = useRef(!savedViewport);
+  useEffect(() => {
+    if (!savedViewport) {
+      shouldFitRef.current = true;
+    }
+  }, [savedViewport]);
+
+  useEffect(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
-  }, [initialNodes, initialEdges, setNodes, setEdges]);
+    if (shouldFitRef.current) {
+      shouldFitRef.current = false;
+      // Allow React Flow to measure the new nodes before fitting
+      requestAnimationFrame(() => {
+        fitView({ padding: 0.2, duration: 200 });
+      });
+    }
+  }, [initialNodes, initialEdges, setNodes, setEdges, fitView]);
 
   // Apply highlighting when selection changes
   useEffect(() => {
@@ -350,6 +508,14 @@ function BlueprintFlowInner({
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
   }, []);
+
+  // Persist node position after drag
+  const onNodeDragStop = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      onNodePositionChange(node.id, node.position);
+    },
+    [onNodePositionChange],
+  );
 
   // Select a node and pan to it (used by search and keyboard nav)
   const selectAndFocus = useCallback(
@@ -424,14 +590,20 @@ function BlueprintFlowInner({
     [],
   );
 
-  // Collect item info for search and legend (single pass)
+  // Collect item info for search and legend (single pass, deduplicate by itemId for legend)
   const { searchItems, legendItems } = useMemo(() => {
     const searchItems: { id: string; name: string }[] = [];
     const legendItems: { id: string; name: string; color: string }[] = [];
+    const seenItemIds = new Set<string>();
     for (const n of initialNodes) {
-      const name = (n.data as BlueprintNodeData).flatNode.itemName;
+      const data = n.data as BlueprintNodeData;
+      const name = data.flatNode.itemName;
       searchItems.push({ id: n.id, name });
-      legendItems.push({ id: n.id, name, color: getItemColor(n.id) });
+      // Deduplicate legend by itemId (split nodes share the same item)
+      if (!seenItemIds.has(data.flatNode.itemId)) {
+        seenItemIds.add(data.flatNode.itemId);
+        legendItems.push({ id: n.id, name, color: getItemColor(data.flatNode.itemId) });
+      }
     }
     return { searchItems, legendItems };
   }, [initialNodes]);
@@ -449,11 +621,10 @@ function BlueprintFlowInner({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
+        onNodeDragStop={onNodeDragStop}
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        fitView={!savedViewport}
-        fitViewOptions={{ padding: 0.2 }}
         defaultViewport={savedViewport ?? undefined}
         minZoom={0.1}
         maxZoom={2}
@@ -474,35 +645,16 @@ function BlueprintFlowInner({
           isDark={isDark}
           onSelect={selectAndFocus}
         />
-        <BlueprintLegend items={legendItems} isDark={isDark} />
-        <Panel position="top-left">
-          <div className="flex gap-1.5">
-            <button
-              onClick={onToggleOrientation}
-              className={`${isDark ? 'bg-gray-800 border-gray-600 text-gray-300 hover:text-gray-100' : 'bg-white border-gray-300 text-gray-500 hover:text-gray-900'} border rounded-md p-1.5 shadow-sm`}
-              title={`Switch to ${orientation === 'horizontal' ? 'vertical' : 'horizontal'} layout`}
-            >
-              {orientation === 'horizontal' ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 3v18" /><path d="m8 7-4 5 4 5" /><path d="m16 7 4 5-4 5" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 12h18" /><path d="m7 8-5 4 5 4" /><path d="m17 8 5 4-5 4" />
-                </svg>
-              )}
-            </button>
-            {hasProgress && (
-              <button
-                onClick={onClearProgress}
-                className={`${isDark ? 'bg-gray-800 border-gray-600 text-gray-300 hover:text-gray-100' : 'bg-white border-gray-300 text-gray-500 hover:text-gray-900'} border rounded-md px-2 py-1.5 shadow-sm text-xs`}
-                title="Reset progress"
-              >
-                Reset progress
-              </button>
-            )}
-          </div>
-        </Panel>
+        <BlueprintToolbar
+          isDark={isDark}
+          orientation={orientation}
+          onToggleOrientation={onToggleOrientation}
+          mergeMode={mergeMode}
+          onToggleMergeMode={onToggleMergeMode}
+          hasProgress={hasProgress}
+          onClearProgress={onClearProgress}
+          legendItems={legendItems}
+        />
       </ReactFlow>
     </div>
   );
@@ -527,9 +679,14 @@ export function BlueprintFlowView() {
   const targets = useStore((s) => s.targets);
   const orientation = useStore((s) => s.blueprintOrientation);
   const setBlueprintOrientation = useStore((s) => s.setBlueprintOrientation);
+  const blueprintMergeMode = useStore((s) => s.blueprintMergeMode);
+  const setBlueprintMergeMode = useStore((s) => s.setBlueprintMergeMode);
   const blueprintProgress = useStore((s) => s.blueprintProgress);
   const toggleBlueprintProgress = useStore((s) => s.toggleBlueprintProgress);
   const clearBlueprintProgress = useStore((s) => s.clearBlueprintProgress);
+  const blueprintPositions = useStore((s) => s.blueprintPositions);
+  const setBlueprintPosition = useStore((s) => s.setBlueprintPosition);
+  const clearBlueprintPositions = useStore((s) => s.clearBlueprintPositions);
 
   const rootItemIds = useMemo(() => {
     if (targets.length > 1) {
@@ -556,9 +713,16 @@ export function BlueprintFlowView() {
         } as AdjacencyMaps,
       };
     }
-    const dag = flattenToDAG(productionResult);
-    dag.nodes = dag.nodes.filter((n) => n.itemId !== '__multi_root__');
-    const positions = layoutDAG(dag, orientation);
+    const dag = flattenToDAG(productionResult, blueprintMergeMode);
+    dag.nodes = dag.nodes.filter((n) => n.nodeKey !== '__multi_root__');
+    const computedPositions = layoutDAG(dag, orientation);
+    // Overlay user-saved position overrides on top of algorithmically computed positions
+    const positions = new Map(computedPositions);
+    for (const [key, pos] of blueprintPositions) {
+      if (positions.has(key)) {
+        positions.set(key, pos);
+      }
+    }
     const { rfNodes, rfEdges, adjacency } = buildReactFlowData(
       dag,
       positions,
@@ -571,7 +735,7 @@ export function BlueprintFlowView() {
       toggleBlueprintProgress,
     );
     return { initialNodes: rfNodes, initialEdges: rfEdges, adjacency };
-  }, [productionResult, beltSpeed, isDark, targetItemId, rootItemIds, orientation, blueprintProgress, toggleBlueprintProgress]);
+  }, [productionResult, beltSpeed, isDark, targetItemId, rootItemIds, orientation, blueprintMergeMode, blueprintProgress, toggleBlueprintProgress, blueprintPositions]);
 
   // Structural key for detecting graph topology changes
   const structureKey = useMemo(() => {
@@ -579,17 +743,22 @@ export function BlueprintFlowView() {
     return `${nodeIds}|${initialEdges.length}`;
   }, [initialNodes, initialEdges]);
 
-  // Reset viewport when structure changes
+  // Reset viewport and saved positions when structure changes
   useEffect(() => {
     if (prevStructureKeyRef.current && structureKey !== prevStructureKeyRef.current) {
       setSavedViewport(null);
+      clearBlueprintPositions();
     }
     prevStructureKeyRef.current = structureKey;
-  }, [structureKey]);
+  }, [structureKey, clearBlueprintPositions]);
 
   const handleViewportChange = useCallback((viewport: Viewport) => {
     setSavedViewport(viewport);
   }, []);
+
+  const handleNodePositionChange = useCallback((nodeKey: string, position: { x: number; y: number }) => {
+    setBlueprintPosition(nodeKey, position);
+  }, [setBlueprintPosition]);
 
   const estimatedHeight = useMemo(() => {
     if (initialNodes.length === 0) return 500;
@@ -603,6 +772,14 @@ export function BlueprintFlowView() {
     setBlueprintOrientation(orientation === 'horizontal' ? 'vertical' : 'horizontal');
     setSavedViewport(null); // reset viewport on layout change
   }, [orientation, setBlueprintOrientation]);
+
+  const toggleMergeMode = useCallback(() => {
+    const next = blueprintMergeMode === 'merged' ? 'hybrid'
+      : blueprintMergeMode === 'hybrid' ? 'dedicated'
+      : 'merged';
+    setBlueprintMergeMode(next);
+    setSavedViewport(null); // reset viewport on mode change
+  }, [blueprintMergeMode, setBlueprintMergeMode]);
 
   if (!productionResult) {
     return (
@@ -629,8 +806,11 @@ export function BlueprintFlowView() {
         onViewportChange={handleViewportChange}
         orientation={orientation}
         onToggleOrientation={toggleOrientation}
+        mergeMode={blueprintMergeMode}
+        onToggleMergeMode={toggleMergeMode}
         hasProgress={blueprintProgress.size > 0}
         onClearProgress={clearBlueprintProgress}
+        onNodePositionChange={handleNodePositionChange}
       />
     </ReactFlowProvider>
   );

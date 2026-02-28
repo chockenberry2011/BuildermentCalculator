@@ -259,8 +259,8 @@ function CompactNode({
     >
       <div className="h-0.5" style={{ backgroundColor: accentColor }} />
       <div className="px-2 py-1 flex items-center gap-1.5 relative">
-        <span className={`font-bold text-xs ${textColor} truncate flex-1`}>
-          {flatNode.itemName}
+        <span className={`font-bold text-xs ${textColor} truncate flex-1`} title={flatNode.consumerItemName ? `${flatNode.itemName} \u2192 ${flatNode.consumerItemName}` : flatNode.itemName}>
+          {flatNode.itemName}{flatNode.consumerItemName ? ` \u2192 ${flatNode.consumerItemName}` : ''}
         </span>
         {count && (
           <span
@@ -374,6 +374,11 @@ function FullNode({
         <div className={`font-bold text-sm ${textColor} truncate pr-5`}>
           {flatNode.itemName}
         </div>
+        {flatNode.consumerItemName && (
+          <div className={`text-[10px] ${subtextColor} truncate`}>
+            {'\u2192'} {flatNode.consumerItemName}
+          </div>
+        )}
 
         {/* Rate */}
         <div className={`text-xs ${subtextColor}`}>

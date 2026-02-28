@@ -15,6 +15,7 @@ import { BuildingIcon } from '../BuildingIcon';
 import { BadgePopover } from '../BadgePopover';
 import { useZoomLevel } from '../../hooks/useZoomLevel';
 import type { BuildingType } from '../../data/buildings';
+import type { SplitterTreeInfo, SplitterTarget } from '../../core/splitterTree';
 
 export interface BlueprintEdgeData {
   flatEdge: FlatEdge;
@@ -35,6 +36,8 @@ export interface BlueprintEdgeData {
   sourceIsRaw: boolean;
   /** Where along the edge (0–1) the bend occurs; 0.5 = centered (default) */
   stepPosition: number;
+  /** Splitter tree info for edges from multi-consumer source nodes */
+  splitterTree: SplitterTreeInfo | null;
   [key: string]: unknown;
 }
 
@@ -57,6 +60,10 @@ function formatRate(rate: number): string {
   return rate.toFixed(1);
 }
 
+function formatTarget(target: SplitterTarget): string {
+  return target.type === 'splitter' ? `S${target.index}` : target.label;
+}
+
 export const BlueprintEdge = memo(function BlueprintEdge({
   id,
   sourceX,
@@ -71,7 +78,7 @@ export const BlueprintEdge = memo(function BlueprintEdge({
 
   if (!data) return null;
 
-  const { flatEdge, beltStatus, beltsNeeded, utilization, maxRate, isDark, isDimmed, sourceBuildingCount, sourceTotalRate, sourceBuildingType, sourceBuildingName, sourceIsRaw, stepPosition } = data;
+  const { flatEdge, beltStatus, beltsNeeded, utilization, maxRate, isDark, isDimmed, sourceBuildingCount, sourceTotalRate, sourceBuildingType, sourceBuildingName, sourceIsRaw, stepPosition, splitterTree } = data;
   const rate = flatEdge.rate.toNumber();
   const itemColor = getItemColor(flatEdge.fromItemId);
   const statusColor = STATUS_COLORS[beltStatus];
@@ -177,8 +184,8 @@ export const BlueprintEdge = memo(function BlueprintEdge({
 
   // Full zoom: complete render with popover on rate pill
   const distribution =
-    beltStatus === 'multi-belt' && sourceBuildingCount
-      ? getBeltDistribution(sourceBuildingCount, beltsNeeded)
+    beltStatus === 'multi-belt' && buildingShare
+      ? getBeltDistribution(buildingShare, beltsNeeded)
       : null;
 
   // Format building share for display
@@ -204,6 +211,7 @@ export const BlueprintEdge = memo(function BlueprintEdge({
       {shareText && sourceBuildingName && (
         <>
           <div className={`border-t my-2 ${dividerClass}`} />
+          <div className={`${labelClass} text-[11px] mb-1`}>Source</div>
           <div className="flex justify-between items-center">
             <span className={labelClass}>
               {sourceIsRaw ? 'Extractors' : sourceBuildingName + 's'}
@@ -214,6 +222,10 @@ export const BlueprintEdge = memo(function BlueprintEdge({
               )}
               {shareText} of {totalBuildingText}
             </span>
+          </div>
+          <div className="flex justify-between">
+            <span className={labelClass}>Feeds</span>
+            <span className="font-medium">{flatEdge.toItemName}</span>
           </div>
         </>
       )}
@@ -246,6 +258,41 @@ export const BlueprintEdge = memo(function BlueprintEdge({
             <div className={`${labelClass} text-[11px]`}>
               {distribution.splitInfo.fullBuildings} full + {distribution.splitInfo.splitNumerator}/{distribution.splitInfo.splitDenominator} split
             </div>
+          )}
+        </>
+      )}
+      {splitterTree && splitterTree.ratioParts.length >= 2 && (
+        <>
+          <div className={`border-t my-2 ${dividerClass}`} />
+          {splitterTree.isSplitterFriendly && splitterTree.steps.length > 0 ? (
+            <>
+              <div className={`${labelClass} text-[11px] mb-1`}>
+                Splitter Guide ({splitterTree.ratioLabel})
+              </div>
+              <div className="space-y-0.5">
+                {splitterTree.steps.map((step) => (
+                  <div key={step.index} className="flex items-center gap-1 text-[11px] font-mono">
+                    <span className={labelClass}>S{step.index}</span>
+                    <span className={labelClass}>L</span>
+                    <span className="font-medium">{formatTarget(step.left)}</span>
+                    <span className={labelClass}>R</span>
+                    <span className="font-medium">{formatTarget(step.right)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between">
+                <span className={labelClass}>Split Ratio</span>
+                <span className="font-medium">{splitterTree.ratioLabel}</span>
+              </div>
+              {!splitterTree.isSplitterFriendly && (
+                <div className="text-[11px] text-amber-500">
+                  Not achievable with even splitters
+                </div>
+              )}
+            </>
           )}
         </>
       )}

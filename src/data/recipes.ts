@@ -51,7 +51,7 @@ const DEFAULT_RECIPES: Recipe[] = [
     outputId: 'iron_gear',
     outputQuantity: 1,
     building: 'workshop',
-    craftTime: 2,
+    craftTime: 4,
     ingredients: [{ itemId: 'iron_ingot', quantity: 2 }],
     isAlternate: false,
   },

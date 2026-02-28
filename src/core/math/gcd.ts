@@ -39,6 +39,23 @@ export function isPowerOf2(n: number): boolean {
   return (n & (n - 1)) === 0;
 }
 
+// Check if an array of integer ratio parts sums to a power of 2
+// (meaning the ratio is achievable with binary splitters in-game)
+export function isSplitterFriendlyRatio(parts: number[]): boolean {
+  if (parts.length <= 1) return true;
+  const sum = parts.reduce((a, b) => a + b, 0);
+  return isPowerOf2(sum);
+}
+
+// Check if an array of integer ratio parts has a small enough sum
+// to be achievable with practical in-game splitter arrangements.
+// Default threshold: sum ≤ 6 covers ratios like 1:5 but excludes 1:6, 3:4, etc.
+export function isSimpleSplitterRatio(parts: number[], maxSum: number = 6): boolean {
+  if (parts.length <= 1) return true;
+  const sum = parts.reduce((a, b) => a + b, 0);
+  return sum <= maxSum;
+}
+
 // Get the nearest power of 2 (can be higher or lower)
 export function nearestPowerOf2(n: number): number {
   if (n <= 0) return 1;

@@ -24,6 +24,7 @@ export type ViewMode = 'tree' | 'blueprint';
 export type ThemeMode = 'light' | 'dark';
 export type OptimizationDetailLevel = 'minimal' | 'standard' | 'full';
 export type BlueprintOrientation = 'horizontal' | 'vertical';
+export type BlueprintMergeMode = 'merged' | 'hybrid' | 'dedicated';
 
 // Feature 2: Fractional building fix suggestions
 export interface ScalingSuggestion {
@@ -97,10 +98,14 @@ interface CalculatorState {
   theme: ThemeMode;
   optimizationDetailLevel: OptimizationDetailLevel;
   blueprintOrientation: BlueprintOrientation;
+  blueprintMergeMode: BlueprintMergeMode;
   collapsedSections: Record<string, boolean>;
 
   // Blueprint progress tracking (itemId → completed)
   blueprintProgress: Map<string, boolean>;
+
+  // Blueprint node position overrides (nodeKey → {x, y})
+  blueprintPositions: Map<string, { x: number; y: number }>;
 
   // Feature 1: Clean rates filter
   cleanRatesOnly: boolean;
@@ -134,6 +139,7 @@ interface CalculatorState {
   setViewMode: (mode: ViewMode) => void;
   setOptimizationDetailLevel: (level: OptimizationDetailLevel) => void;
   setBlueprintOrientation: (orientation: BlueprintOrientation) => void;
+  setBlueprintMergeMode: (mode: BlueprintMergeMode) => void;
   toggleTheme: () => void;
   setBeltSpeed: (speed: number) => void;
   toggleBeltInfo: () => void;
@@ -147,6 +153,8 @@ interface CalculatorState {
   setRateFromExtractorCount: (resourceId: string, extractorCount: number) => void;
   toggleBlueprintProgress: (itemId: string) => void;
   clearBlueprintProgress: () => void;
+  setBlueprintPosition: (nodeKey: string, position: { x: number; y: number }) => void;
+  clearBlueprintPositions: () => void;
   resetCalculator: () => void;
   toggleSection: (sectionId: string) => void;
   addTarget: () => void;
@@ -200,8 +208,10 @@ export const useStore = create<CalculatorState>()(
       theme: 'dark',
       optimizationDetailLevel: 'standard',
       blueprintOrientation: 'horizontal' as BlueprintOrientation,
+      blueprintMergeMode: 'hybrid' as BlueprintMergeMode,
       collapsedSections: {},
       blueprintProgress: new Map(),
+      blueprintPositions: new Map(),
       cleanRatesOnly: false,
       autoIntegerMode: false,
       fractionalProposals: [],
@@ -259,6 +269,10 @@ export const useStore = create<CalculatorState>()(
 
       setBlueprintOrientation: (orientation) => {
         set({ blueprintOrientation: orientation });
+      },
+
+      setBlueprintMergeMode: (mode) => {
+        set({ blueprintMergeMode: mode });
       },
 
       toggleTheme: () => {
@@ -442,6 +456,16 @@ export const useStore = create<CalculatorState>()(
         set({ blueprintProgress: new Map() });
       },
 
+      setBlueprintPosition: (nodeKey, position) => {
+        const positions = new Map(get().blueprintPositions);
+        positions.set(nodeKey, position);
+        set({ blueprintPositions: positions });
+      },
+
+      clearBlueprintPositions: () => {
+        set({ blueprintPositions: new Map() });
+      },
+
       resetCalculator: () => {
         set({
           targetItemId: 'wood_plank',
@@ -607,11 +631,13 @@ export const useStore = create<CalculatorState>()(
         theme: state.theme,
         optimizationDetailLevel: state.optimizationDetailLevel,
         blueprintOrientation: state.blueprintOrientation,
+        blueprintMergeMode: state.blueprintMergeMode,
         cleanRatesOnly: state.cleanRatesOnly,
         autoIntegerMode: state.autoIntegerMode,
         resourceConstraints: state.resourceConstraints,
         collapsedSections: state.collapsedSections,
         blueprintProgress: mapToObject(state.blueprintProgress),
+        blueprintPositions: mapToObject(state.blueprintPositions),
       }),
       onRehydrateStorage: () => (state, error) => {
         if (state) {
@@ -620,6 +646,7 @@ export const useStore = create<CalculatorState>()(
           state.buildingLevels = objectToMap(state.buildingLevels as unknown as Record<BuildingType, number>);
 
           state.blueprintProgress = objectToMap(state.blueprintProgress as unknown as Record<string, boolean>);
+          state.blueprintPositions = objectToMap(state.blueprintPositions as unknown as Record<string, { x: number; y: number }>);
 
           // Migrate persisted 'graph' viewMode to 'blueprint'
           if ((state.viewMode as string) === 'graph') {
@@ -665,6 +692,7 @@ export const useStore = create<CalculatorState>()(
           }
           if (urlState.belt !== undefined) state.beltSpeed = urlState.belt;
           if (urlState.view) state.viewMode = urlState.view;
+          if (urlState.merge) state.blueprintMergeMode = urlState.merge;
           if (urlState.recipes) {
             for (const [k, v] of urlState.recipes) {
               state.recipeSelections.set(k, v);
@@ -692,6 +720,7 @@ if (typeof window !== 'undefined') {
       targetRate: state.targetRate,
       beltSpeed: state.beltSpeed,
       viewMode: state.viewMode,
+      blueprintMergeMode: state.blueprintMergeMode,
       recipeSelections: state.recipeSelections,
       buildingLevels: state.buildingLevels,
       targets: state.targets,

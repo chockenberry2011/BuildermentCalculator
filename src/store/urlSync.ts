@@ -1,11 +1,12 @@
 import { ITEMS } from '../data/items';
-import { ViewMode } from './useStore';
+import { ViewMode, BlueprintMergeMode } from './useStore';
 
 export interface URLState {
   item?: string;
   rate?: number;
   belt?: number;
   view?: ViewMode;
+  merge?: BlueprintMergeMode;
   recipes?: Map<string, string>;
   levels?: Map<string, number>;
   targets?: { itemId: string; rate: number }[];
@@ -62,6 +63,12 @@ export function parseURLParams(): URLState {
     result.view = view;
   }
 
+  // Merge mode
+  const merge = params.get('merge');
+  if (merge === 'merged' || merge === 'hybrid' || merge === 'dedicated') {
+    result.merge = merge;
+  }
+
   // Recipe selections (key:value pairs)
   const recipes = params.get('recipes');
   if (recipes) {
@@ -97,6 +104,7 @@ interface StoreStateForURL {
   targetRate: number;
   beltSpeed: number;
   viewMode: ViewMode;
+  blueprintMergeMode: BlueprintMergeMode;
   recipeSelections: Map<string, string>;
   buildingLevels: Map<string, number>;
   targets?: { id: string; itemId: string; rate: number }[];
@@ -119,6 +127,11 @@ export function updateURL(state: StoreStateForURL) {
 
   params.set('belt', String(state.beltSpeed));
   params.set('view', state.viewMode);
+
+  // Only include non-default merge mode (default is 'hybrid')
+  if (state.blueprintMergeMode !== 'hybrid') {
+    params.set('merge', state.blueprintMergeMode);
+  }
 
   // Only include non-default recipe selections
   if (state.recipeSelections.size > 0) {

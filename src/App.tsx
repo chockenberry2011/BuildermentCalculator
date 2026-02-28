@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { TargetList } from './components/TargetList';
 import { ResourceInput } from './components/ResourceInput';
 import { RecipePickerList } from './components/RecipePicker';
@@ -14,6 +14,7 @@ import { ExportButton } from './components/ExportButton';
 import { CollapsibleSection } from './components/CollapsibleSection';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useStore } from './store/useStore';
+import { getItem } from './data/items';
 
 function ResetButton() {
   const theme = useStore((s) => s.theme);
@@ -38,6 +39,42 @@ function ResetButton() {
   );
 }
 
+function StickyTargetSummary({ visible, isDark }: { visible: boolean; isDark: boolean }) {
+  const targets = useStore((s) => s.targets);
+
+  if (!visible) return null;
+
+  return (
+    <div
+      className={`fixed top-0 left-0 right-0 z-50 border-b backdrop-blur-sm transition-opacity ${
+        isDark
+          ? 'bg-gray-800/95 border-gray-700'
+          : 'bg-white/95 border-gray-200'
+      }`}
+    >
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-1.5 flex items-center gap-4 overflow-x-auto">
+        <span className={`text-xs font-medium shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Building</span>
+        <div className="flex items-center gap-3 min-w-0">
+          {targets.map((target, i) => {
+            const item = getItem(target.itemId);
+            return (
+              <span key={target.id} className="flex items-center gap-1.5 shrink-0">
+                {i > 0 && <span className={`${isDark ? 'text-gray-600' : 'text-gray-300'}`}>+</span>}
+                <span className={`text-sm font-medium ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                  {item?.name ?? target.itemId}
+                </span>
+                <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {target.rate}/min
+                </span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AppContent() {
   const viewMode = useStore((s) => s.viewMode);
   const theme = useStore((s) => s.theme);
@@ -46,6 +83,21 @@ function AppContent() {
   const toggleSection = useStore((s) => s.toggleSection);
   const bestPracticalRates = useStore((s) => s.bestPracticalRates);
   const productionResult = useStore((s) => s.productionResult);
+
+  // Track when TargetList scrolls out of view
+  const targetListRef = useRef<HTMLDivElement>(null);
+  const [showStickyBar, setShowStickyBar] = useState(false);
+
+  useEffect(() => {
+    const el = targetListRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowStickyBar(!entry.isIntersecting),
+      { threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Apply theme to document
   useEffect(() => {
@@ -62,6 +114,8 @@ function AppContent() {
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
+      <StickyTargetSummary visible={showStickyBar} isDark={isDark} />
+
       {/* Header */}
       <header className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b px-4 sm:px-6 py-3 sm:py-4`}>
         <div className="max-w-6xl mx-auto flex flex-row items-center justify-between gap-4">
@@ -88,7 +142,7 @@ function AppContent() {
       <main className="py-4 sm:py-6">
         {/* Zone 1: Constrained top */}
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className={`group/sticky ${isDark ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg p-2 sm:p-3 mb-4 sm:mb-6 sticky top-0 z-10 shadow-sm`}>
+          <div ref={targetListRef} className={`group/sticky ${isDark ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg p-2 sm:p-3 mb-4 sm:mb-6 shadow-sm`}>
             <TargetList />
           </div>
 

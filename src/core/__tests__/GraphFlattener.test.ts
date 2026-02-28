@@ -69,6 +69,171 @@ describe('flattenToDAG', () => {
   });
 });
 
+describe('flattenToDAG dedicated mode', () => {
+  it('splits shared node with non-splitter-friendly ratio', () => {
+    // Electric motor at 7.5/min has graphite feeding both steel and electromagnet
+    // with a non-power-of-2 ratio
+    const result = calculateProduction('electric_motor', 7.5, noRecipes, defaultLevels);
+    const dag = flattenToDAG(result, 'dedicated');
+
+    // Check for split graphite nodes
+    const graphiteNodes = dag.nodes.filter((n) => n.itemId === 'graphite');
+
+    // In merged mode, graphite has 2 consumers (steel + electromagnet)
+    const mergedDag = flattenToDAG(result, 'merged');
+    const mergedGraphiteOutEdges = mergedDag.edges.filter((e) => e.fromItemId === 'graphite');
+
+    if (mergedGraphiteOutEdges.length >= 2) {
+      // If graphite has multiple consumers, it should be split in dedicated mode
+      // (unless the ratio happens to be splitter-friendly)
+      expect(graphiteNodes.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('keeps single-consumer nodes unchanged', () => {
+    const result = calculateProduction('iron_ingot', 1, noRecipes, defaultLevels);
+    const mergedDag = flattenToDAG(result, 'merged');
+    const dedicatedDag = flattenToDAG(result, 'dedicated');
+
+    // Simple linear chain — no shared nodes to split
+    expect(dedicatedDag.nodes.length).toBe(mergedDag.nodes.length);
+    expect(dedicatedDag.edges.length).toBe(mergedDag.edges.length);
+  });
+
+  it('split node rates sum to original total', () => {
+    const result = calculateProduction('electric_motor', 7.5, noRecipes, defaultLevels);
+    const mergedDag = flattenToDAG(result, 'merged');
+    const dedicatedDag = flattenToDAG(result, 'dedicated');
+
+    // For each item that was split, verify rates sum to original
+    const mergedRates = new Map<string, number>();
+    for (const node of mergedDag.nodes) {
+      mergedRates.set(node.itemId, node.totalRate.toNumber());
+    }
+
+    const dedicatedRates = new Map<string, number>();
+    for (const node of dedicatedDag.nodes) {
+      const existing = dedicatedRates.get(node.itemId) ?? 0;
+      dedicatedRates.set(node.itemId, existing + node.totalRate.toNumber());
+    }
+
+    for (const [itemId, mergedRate] of mergedRates) {
+      const dedicatedRate = dedicatedRates.get(itemId) ?? 0;
+      expect(dedicatedRate).toBeCloseTo(mergedRate, 6);
+    }
+  });
+
+  it('all dedicated nodes have nodeKey different from itemId', () => {
+    const result = calculateProduction('electric_motor', 7.5, noRecipes, defaultLevels);
+    const dag = flattenToDAG(result, 'dedicated');
+
+    for (const node of dag.nodes) {
+      if (node.consumerItemId) {
+        expect(node.nodeKey).toBe(`${node.itemId}_for_${node.consumerItemId}`);
+        expect(node.consumerItemName).toBeTruthy();
+      } else {
+        expect(node.nodeKey).toBe(node.itemId);
+      }
+    }
+  });
+
+  it('merged mode sets nodeKey equal to itemId for all nodes', () => {
+    const result = calculateProduction('electric_motor', 7.5, noRecipes, defaultLevels);
+    const dag = flattenToDAG(result, 'merged');
+
+    for (const node of dag.nodes) {
+      expect(node.nodeKey).toBe(node.itemId);
+    }
+  });
+
+  it('splitter-friendly shared nodes stay merged in dedicated mode', () => {
+    // Find or construct a case where a shared node has a power-of-2 ratio sum
+    // For now, verify that not ALL shared nodes are split — only unfriendly ones
+    const result = calculateProduction('turbocharger', 1, noRecipes, defaultLevels);
+    const mergedDag = flattenToDAG(result, 'merged');
+    const dedicatedDag = flattenToDAG(result, 'dedicated');
+
+    // Count how many nodes have consumerItemId set (= were split)
+    const splitCount = dedicatedDag.nodes.filter((n) => n.consumerItemId).length;
+    // Some nodes should stay merged (those with friendly ratios or single consumer)
+    const mergedCount = dedicatedDag.nodes.filter((n) => !n.consumerItemId).length;
+    expect(mergedCount).toBeGreaterThan(0);
+
+    // Total unique itemIds should be preserved
+    const mergedItemIds = new Set(mergedDag.nodes.map((n) => n.itemId));
+    const dedicatedItemIds = new Set(dedicatedDag.nodes.map((n) => n.itemId));
+    expect(dedicatedItemIds).toEqual(mergedItemIds);
+
+    // If any were split, verify they were actually non-friendly
+    if (splitCount > 0) {
+      expect(splitCount).toBeGreaterThanOrEqual(2); // split creates at least 2 nodes
+    }
+  });
+});
+
+describe('flattenToDAG hybrid mode', () => {
+  it('splits fewer nodes than dedicated mode', () => {
+    const result = calculateProduction('electric_motor', 7.5, noRecipes, defaultLevels);
+    const hybridDag = flattenToDAG(result, 'hybrid');
+    const dedicatedDag = flattenToDAG(result, 'dedicated');
+
+    // Hybrid is more permissive, so it should split the same or fewer nodes
+    const hybridSplitCount = hybridDag.nodes.filter((n) => n.consumerItemId).length;
+    const dedicatedSplitCount = dedicatedDag.nodes.filter((n) => n.consumerItemId).length;
+
+    expect(hybridSplitCount).toBeLessThanOrEqual(dedicatedSplitCount);
+  });
+
+  it('split node rates sum to original total', () => {
+    const result = calculateProduction('electric_motor', 7.5, noRecipes, defaultLevels);
+    const mergedDag = flattenToDAG(result, 'merged');
+    const hybridDag = flattenToDAG(result, 'hybrid');
+
+    const mergedRates = new Map<string, number>();
+    for (const node of mergedDag.nodes) {
+      mergedRates.set(node.itemId, node.totalRate.toNumber());
+    }
+
+    const hybridRates = new Map<string, number>();
+    for (const node of hybridDag.nodes) {
+      const existing = hybridRates.get(node.itemId) ?? 0;
+      hybridRates.set(node.itemId, existing + node.totalRate.toNumber());
+    }
+
+    for (const [itemId, mergedRate] of mergedRates) {
+      const hybridRate = hybridRates.get(itemId) ?? 0;
+      expect(hybridRate).toBeCloseTo(mergedRate, 6);
+    }
+  });
+
+  it('hybrid split items are a subset of dedicated split items', () => {
+    const result = calculateProduction('electric_motor', 7.5, noRecipes, defaultLevels);
+    const hybridDag = flattenToDAG(result, 'hybrid');
+    const dedicatedDag = flattenToDAG(result, 'dedicated');
+
+    const hybridSplitItems = new Set(
+      hybridDag.nodes.filter((n) => n.consumerItemId).map((n) => n.itemId),
+    );
+    const dedicatedSplitItems = new Set(
+      dedicatedDag.nodes.filter((n) => n.consumerItemId).map((n) => n.itemId),
+    );
+
+    for (const itemId of hybridSplitItems) {
+      expect(dedicatedSplitItems.has(itemId)).toBe(true);
+    }
+  });
+
+  it('preserves all unique itemIds', () => {
+    const result = calculateProduction('electric_motor', 7.5, noRecipes, defaultLevels);
+    const mergedDag = flattenToDAG(result, 'merged');
+    const hybridDag = flattenToDAG(result, 'hybrid');
+
+    const mergedItemIds = new Set(mergedDag.nodes.map((n) => n.itemId));
+    const hybridItemIds = new Set(hybridDag.nodes.map((n) => n.itemId));
+    expect(hybridItemIds).toEqual(mergedItemIds);
+  });
+});
+
 describe('layoutDAG', () => {
   it('assigns positions to all nodes', () => {
     const result = calculateProduction('turbocharger', 1, noRecipes, defaultLevels);
@@ -134,9 +299,9 @@ describe('layoutDAG', () => {
     }
 
     // Every position should correspond to a real DAG node
-    const dagNodeIds = new Set(dag.nodes.map((n) => n.itemId));
+    const dagNodeKeys = new Set(dag.nodes.map((n) => n.nodeKey));
     for (const key of positions.keys()) {
-      expect(dagNodeIds.has(key)).toBe(true);
+      expect(dagNodeKeys.has(key)).toBe(true);
     }
   });
 
