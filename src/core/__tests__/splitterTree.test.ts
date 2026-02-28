@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSplitterTree, ratesToParts } from '../splitterTree';
+import { buildSplitterTree, ratesToParts, traceSplitterPath } from '../splitterTree';
 
 describe('buildSplitterTree', () => {
   it('returns no steps for a single consumer', () => {
@@ -103,6 +103,82 @@ describe('buildSplitterTree', () => {
     // The algorithm should still produce steps (it won't perfectly balance)
     expect(result.isSplitterFriendly).toBe(true);
     expect(result.totalParts).toBe(4);
+  });
+});
+
+describe('traceSplitterPath', () => {
+  it('traces to each consumer in a 1:1 split', () => {
+    const tree = buildSplitterTree([
+      { label: 'Iron Gear', parts: 1 },
+      { label: 'Iron Plating', parts: 1 },
+    ]);
+
+    const pathGear = traceSplitterPath(tree, 'Iron Gear');
+    expect(pathGear).not.toBeNull();
+    expect(pathGear!.depth).toBe(1);
+    expect(pathGear!.targetParts).toBe(1);
+    expect(pathGear!.hops).toHaveLength(1);
+
+    const pathPlating = traceSplitterPath(tree, 'Iron Plating');
+    expect(pathPlating).not.toBeNull();
+    expect(pathPlating!.depth).toBe(1);
+    expect(pathPlating!.targetParts).toBe(1);
+
+    // They should take opposite sides
+    expect(pathGear!.hops[0].side).not.toBe(pathPlating!.hops[0].side);
+  });
+
+  it('traces to 2-part consumer at depth 1 and 1-part consumer at depth 2 in 1:1:2', () => {
+    const tree = buildSplitterTree([
+      { label: 'Iron Gear', parts: 1 },
+      { label: 'Iron Plating', parts: 1 },
+      { label: 'Electromagnet', parts: 2 },
+    ]);
+
+    const pathElectro = traceSplitterPath(tree, 'Electromagnet');
+    expect(pathElectro).not.toBeNull();
+    expect(pathElectro!.depth).toBe(1);
+    expect(pathElectro!.targetParts).toBe(2);
+
+    const pathGear = traceSplitterPath(tree, 'Iron Gear');
+    expect(pathGear).not.toBeNull();
+    expect(pathGear!.depth).toBe(2);
+    expect(pathGear!.targetParts).toBe(1);
+  });
+
+  it('traces at depth 2 for 1:1:1:1', () => {
+    const tree = buildSplitterTree([
+      { label: 'A', parts: 1 },
+      { label: 'B', parts: 1 },
+      { label: 'C', parts: 1 },
+      { label: 'D', parts: 1 },
+    ]);
+
+    for (const label of ['A', 'B', 'C', 'D']) {
+      const path = traceSplitterPath(tree, label);
+      expect(path).not.toBeNull();
+      expect(path!.depth).toBe(2);
+      expect(path!.targetParts).toBe(1);
+    }
+  });
+
+  it('returns null for non-friendly ratio', () => {
+    const tree = buildSplitterTree([
+      { label: 'A', parts: 1 },
+      { label: 'B', parts: 1 },
+      { label: 'C', parts: 1 },
+    ]);
+
+    expect(traceSplitterPath(tree, 'A')).toBeNull();
+  });
+
+  it('returns null for unknown label', () => {
+    const tree = buildSplitterTree([
+      { label: 'Iron Gear', parts: 1 },
+      { label: 'Iron Plating', parts: 1 },
+    ]);
+
+    expect(traceSplitterPath(tree, 'Nonexistent')).toBeNull();
   });
 });
 

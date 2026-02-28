@@ -140,6 +140,74 @@ function findBalancedPartition(group: Consumer[], target: number): number[] | nu
   return null;
 }
 
+export interface SplitterPath {
+  hops: { stepIndex: number; side: 'left' | 'right' }[];
+  depth: number;
+  targetParts: number;
+}
+
+/**
+ * Check whether a subtree rooted at `target` contains an output with the given label.
+ */
+function containsLabel(
+  target: SplitterTarget,
+  label: string,
+  stepMap: Map<number, SplitterStep>,
+): boolean {
+  if (target.type === 'output') return target.label === label;
+  const step = stepMap.get(target.index);
+  if (!step) return false;
+  return containsLabel(step.left, label, stepMap) || containsLabel(step.right, label, stepMap);
+}
+
+/**
+ * Trace the path from the root splitter down to the leaf matching `targetLabel`.
+ * Returns the sequence of hops (step index + side taken), or null if not found.
+ * Steps are walked root-first (from the last step, which is the root, downward).
+ */
+export function traceSplitterPath(
+  tree: SplitterTreeInfo,
+  targetLabel: string,
+): SplitterPath | null {
+  if (!tree.isSplitterFriendly || tree.steps.length === 0) return null;
+
+  const stepMap = new Map<number, SplitterStep>();
+  for (const step of tree.steps) {
+    stepMap.set(step.index, step);
+  }
+
+  const root = tree.steps[tree.steps.length - 1];
+  const hops: { stepIndex: number; side: 'left' | 'right' }[] = [];
+
+  let current: SplitterStep | undefined = root;
+  while (current) {
+    // Check left side
+    if (containsLabel(current.left, targetLabel, stepMap)) {
+      hops.push({ stepIndex: current.index, side: 'left' });
+      if (current.left.type === 'output') break;
+      current = stepMap.get(current.left.index);
+    } else if (containsLabel(current.right, targetLabel, stepMap)) {
+      hops.push({ stepIndex: current.index, side: 'right' });
+      if (current.right.type === 'output') break;
+      current = stepMap.get(current.right.index);
+    } else {
+      return null; // label not found
+    }
+  }
+
+  if (hops.length === 0) return null;
+
+  // Find the target parts from ratioParts
+  const targetEntry = tree.ratioParts.find((r) => r.label === targetLabel);
+  if (!targetEntry) return null;
+
+  return {
+    hops,
+    depth: hops.length,
+    targetParts: targetEntry.parts,
+  };
+}
+
 /**
  * Convenience: compute integer ratio parts from raw rate numbers.
  * Scales rates to avoid float precision issues, then divides by GCD.

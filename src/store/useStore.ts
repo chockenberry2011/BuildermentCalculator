@@ -101,7 +101,7 @@ interface CalculatorState {
   blueprintMergeMode: BlueprintMergeMode;
   collapsedSections: Record<string, boolean>;
 
-  // Blueprint progress tracking (itemId → completed)
+  // Blueprint progress tracking (nodeKey → completed)
   blueprintProgress: Map<string, boolean>;
 
   // Blueprint node position overrides (nodeKey → {x, y})
@@ -151,7 +151,7 @@ interface CalculatorState {
   setRateFromItemBuildingCount: (itemId: string, count: number) => void;
   setRateFromResourceAmount: (resourceId: string, ratePerMinute: number) => void;
   setRateFromExtractorCount: (resourceId: string, extractorCount: number) => void;
-  toggleBlueprintProgress: (itemId: string) => void;
+  toggleBlueprintProgress: (nodeKey: string) => void;
   clearBlueprintProgress: () => void;
   setBlueprintPosition: (nodeKey: string, position: { x: number; y: number }) => void;
   clearBlueprintPositions: () => void;
@@ -442,12 +442,12 @@ export const useStore = create<CalculatorState>()(
         get().recalculate();
       },
 
-      toggleBlueprintProgress: (itemId) => {
+      toggleBlueprintProgress: (nodeKey) => {
         const progress = new Map(get().blueprintProgress);
-        if (progress.get(itemId)) {
-          progress.delete(itemId);
+        if (progress.get(nodeKey)) {
+          progress.delete(nodeKey);
         } else {
-          progress.set(itemId, true);
+          progress.set(nodeKey, true);
         }
         set({ blueprintProgress: progress });
       },

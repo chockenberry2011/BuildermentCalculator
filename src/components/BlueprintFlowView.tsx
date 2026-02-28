@@ -106,8 +106,8 @@ function buildReactFlowData(
         isDark,
         isRoot: rootItemIds ? rootItemIds.has(flatNode.itemId) : flatNode.itemId === rootItemId,
         orientation,
-        isCompleted: blueprintProgress?.get(flatNode.itemId) ?? false,
-        onToggleCompleted: toggleBlueprintProgress ? () => toggleBlueprintProgress(flatNode.itemId) : undefined,
+        isCompleted: blueprintProgress?.get(flatNode.nodeKey) ?? false,
+        onToggleCompleted: toggleBlueprintProgress ? () => toggleBlueprintProgress(flatNode.nodeKey) : undefined,
       } satisfies BlueprintNodeData,
     };
   });

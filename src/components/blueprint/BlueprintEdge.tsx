@@ -15,7 +15,7 @@ import { BuildingIcon } from '../BuildingIcon';
 import { BadgePopover } from '../BadgePopover';
 import { useZoomLevel } from '../../hooks/useZoomLevel';
 import type { BuildingType } from '../../data/buildings';
-import type { SplitterTreeInfo, SplitterTarget } from '../../core/splitterTree';
+import { traceSplitterPath, type SplitterTreeInfo, type SplitterTarget } from '../../core/splitterTree';
 
 export interface BlueprintEdgeData {
   flatEdge: FlatEdge;
@@ -261,41 +261,87 @@ export const BlueprintEdge = memo(function BlueprintEdge({
           )}
         </>
       )}
-      {splitterTree && splitterTree.ratioParts.length >= 2 && (
-        <>
-          <div className={`border-t my-2 ${dividerClass}`} />
-          {splitterTree.isSplitterFriendly && splitterTree.steps.length > 0 ? (
-            <>
-              <div className={`${labelClass} text-[11px] mb-1`}>
-                Splitter Guide ({splitterTree.ratioLabel})
-              </div>
-              <div className="space-y-0.5">
-                {splitterTree.steps.map((step) => (
-                  <div key={step.index} className="flex items-center gap-1 text-[11px] font-mono">
-                    <span className={labelClass}>S{step.index}</span>
-                    <span className={labelClass}>L</span>
-                    <span className="font-medium">{formatTarget(step.left)}</span>
-                    <span className={labelClass}>R</span>
-                    <span className="font-medium">{formatTarget(step.right)}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex justify-between">
-                <span className={labelClass}>Split Ratio</span>
-                <span className="font-medium">{splitterTree.ratioLabel}</span>
-              </div>
-              {!splitterTree.isSplitterFriendly && (
-                <div className="text-[11px] text-amber-500">
-                  Not achievable with even splitters
+      {splitterTree && splitterTree.ratioParts.length >= 2 && (() => {
+        const targetLabel = flatEdge.toItemName;
+        const path = splitterTree.isSplitterFriendly
+          ? traceSplitterPath(splitterTree, targetLabel)
+          : null;
+        const onPathSteps = path
+          ? new Set(path.hops.map((h) => h.stepIndex))
+          : null;
+        // Map step index → side taken toward target
+        const hopSideMap = path
+          ? new Map(path.hops.map((h) => [h.stepIndex, h.side]))
+          : null;
+
+        const highlightClass = isDark ? 'text-blue-400' : 'text-blue-600';
+        const onPathClass = isDark ? 'text-blue-400' : 'text-blue-500';
+
+        return (
+          <>
+            <div className={`border-t my-2 ${dividerClass}`} />
+            {splitterTree.isSplitterFriendly && splitterTree.steps.length > 0 ? (
+              <>
+                <div className={`${labelClass} text-[11px] mb-1`}>Splitter Guide</div>
+                <div className="text-[11px] font-mono mb-1">
+                  {splitterTree.ratioParts.map((rp, i) => (
+                    <span key={rp.label}>
+                      {i > 0 && <span className={labelClass}>{' : '}</span>}
+                      <span
+                        className={rp.label === targetLabel ? `font-bold ${highlightClass}` : labelClass}
+                        title={rp.label}
+                      >
+                        {rp.parts}
+                      </span>
+                    </span>
+                  ))}
                 </div>
-              )}
-            </>
-          )}
-        </>
-      )}
+                <div className="space-y-0.5">
+                  {[...splitterTree.steps].reverse().map((step) => {
+                    const isOnPath = onPathSteps?.has(step.index) ?? false;
+                    const stepSide = hopSideMap?.get(step.index);
+
+                    const getTargetClass = (target: SplitterTarget, side: 'left' | 'right') => {
+                      if (target.type === 'output' && target.label === targetLabel) {
+                        return `font-bold ${highlightClass}`;
+                      }
+                      if (isOnPath && stepSide === side) return onPathClass;
+                      return labelClass;
+                    };
+
+                    return (
+                      <div key={step.index} className="flex items-center gap-1 text-[11px] font-mono">
+                        <span className={isOnPath ? onPathClass : labelClass}>S{step.index}</span>
+                        <span className={labelClass}>L:</span>
+                        <span className={getTargetClass(step.left, 'left')}>{formatTarget(step.left)}</span>
+                        <span className={labelClass}>R:</span>
+                        <span className={getTargetClass(step.right, 'right')}>{formatTarget(step.right)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {path && (
+                  <div className={`${labelClass} text-[10px] mt-1`}>
+                    {path.depth} splitter{path.depth > 1 ? 's' : ''} from source
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span className={labelClass}>Split Ratio</span>
+                  <span className="font-medium">{splitterTree.ratioLabel}</span>
+                </div>
+                {!splitterTree.isSplitterFriendly && (
+                  <div className="text-[11px] text-amber-500">
+                    Not achievable with even splitters
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 
