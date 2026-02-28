@@ -17,7 +17,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useStore, type BlueprintOrientation, type BlueprintMergeMode } from '../store/useStore';
 import { flattenToDAG, layoutDAG, type FlatDAG } from '../core/GraphFlattener';
-import { BlueprintNode, type BlueprintNodeData } from './blueprint/BlueprintNode';
+import { BlueprintNode, type BlueprintNodeData, type NodeInputInfo } from './blueprint/BlueprintNode';
 import { BlueprintEdge, type BlueprintEdgeData } from './blueprint/BlueprintEdge';
 import { BlueprintSearch } from './blueprint/BlueprintSearch';
 import { useZoomLevel } from '../hooks/useZoomLevel';
@@ -52,6 +52,7 @@ function buildReactFlowData(
 ): { rfNodes: Node[]; rfEdges: Edge[]; adjacency: AdjacencyMaps } {
   const inputsOf = new Map<string, string[]>();
   const outputsOf = new Map<string, string[]>();
+  const incomingEdgesOf = new Map<string, typeof dag.edges>();
   for (const edge of dag.edges) {
     const existingInputs = inputsOf.get(edge.toNodeKey) ?? [];
     existingInputs.push(edge.fromNodeKey);
@@ -60,6 +61,10 @@ function buildReactFlowData(
     const existingOutputs = outputsOf.get(edge.fromNodeKey) ?? [];
     existingOutputs.push(edge.toNodeKey);
     outputsOf.set(edge.fromNodeKey, existingOutputs);
+
+    const incoming = incomingEdgesOf.get(edge.toNodeKey) ?? [];
+    incoming.push(edge);
+    incomingEdgesOf.set(edge.toNodeKey, incoming);
   }
 
   // Build rank members from positions
@@ -95,6 +100,13 @@ function buildReactFlowData(
     const nodeInputs = inputsOf.get(flatNode.nodeKey) ?? [];
     const nodeOutputs = outputsOf.get(flatNode.nodeKey) ?? [];
 
+    const inEdges = incomingEdgesOf.get(flatNode.nodeKey) ?? [];
+    const inputIngredients: NodeInputInfo[] = inEdges.map((edge) => ({
+      itemId: edge.fromItemId,
+      itemName: edge.itemName,
+      rate: edge.rate,
+    }));
+
     return {
       id: flatNode.nodeKey,
       type: 'blueprint',
@@ -103,6 +115,7 @@ function buildReactFlowData(
         flatNode,
         inputItemIds: nodeInputs,
         outputItemIds: nodeOutputs,
+        inputIngredients,
         isDark,
         isRoot: rootItemIds ? rootItemIds.has(flatNode.itemId) : flatNode.itemId === rootItemId,
         orientation,

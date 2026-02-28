@@ -12,10 +12,17 @@ import { SplitBadge } from '../SplitBadge';
 import { BadgePopover } from '../BadgePopover';
 import { useZoomLevel, type ZoomLevel } from '../../hooks/useZoomLevel';
 
+export interface NodeInputInfo {
+  itemId: string;
+  itemName: string;
+  rate: Rational;
+}
+
 export interface BlueprintNodeData {
   flatNode: FlatNode;
   inputItemIds: string[];
   outputItemIds: string[];
+  inputIngredients?: NodeInputInfo[];
   isDark: boolean;
   isRoot: boolean;
   isDimmed?: boolean;
@@ -307,6 +314,7 @@ function FullNode({
   accentColor,
   inputItemIds,
   outputItemIds,
+  inputIngredients,
   isDark,
   isRoot,
   isSelected,
@@ -318,6 +326,7 @@ function FullNode({
   accentColor: string;
   inputItemIds: string[];
   outputItemIds: string[];
+  inputIngredients: NodeInputInfo[];
   isDark: boolean;
   isRoot: boolean;
   isSelected: boolean;
@@ -404,6 +413,27 @@ function FullNode({
         {count && !count.isInteger && (
           <SplitBadge count={building!.count} variant="line" isDark={isDark} />
         )}
+
+        {/* Input ingredients */}
+        {inputIngredients.length > 0 && (
+          <div className={`mt-1.5 pt-1 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
+            <div className={`text-[10px] font-semibold uppercase tracking-wider ${subtextColor} mb-0.5`}>
+              Inputs
+            </div>
+            {inputIngredients.map((input) => (
+              <div key={input.itemId} className="flex items-center gap-1.5 text-xs leading-[14px]">
+                <span
+                  className="shrink-0 rounded-full"
+                  style={{ width: 6, height: 6, backgroundColor: getItemColor(input.itemId) }}
+                />
+                <span className={`${textColor} truncate flex-1`}>{input.itemName}</span>
+                <span className={`${subtextColor} shrink-0 tabular-nums`}>
+                  {formatRate(input.rate)}/m
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <NodeHandles
@@ -420,7 +450,7 @@ function FullNode({
 }
 
 export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
-  const { flatNode, inputItemIds, outputItemIds, isDark, isRoot, isDimmed, isSelected, orientation, isCompleted, onToggleCompleted } = data as BlueprintNodeData;
+  const { flatNode, inputItemIds, outputItemIds, inputIngredients, isDark, isRoot, isDimmed, isSelected, orientation, isCompleted, onToggleCompleted } = data as BlueprintNodeData;
   const accentColor = getItemColor(flatNode.itemId);
   const zoomLevel: ZoomLevel = useZoomLevel();
   const orient = orientation ?? 'horizontal';
@@ -470,6 +500,7 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
         accentColor={accentColor}
         inputItemIds={inputItemIds}
         outputItemIds={outputItemIds}
+        inputIngredients={inputIngredients ?? []}
         isDark={isDark}
         isRoot={isRoot}
         isSelected={isSelected ?? false}
