@@ -29,26 +29,30 @@ export function BuildingLevelConfig() {
           <div key={buildingId} className="flex flex-col items-center gap-0.5">
             <div className="flex items-center gap-1">
               <BuildingIcon buildingType={buildingId} />
-              <select
-                value={level}
-                onChange={(e) =>
-                  setBuildingLevel(buildingId, parseInt(e.target.value, 10))
-                }
-                className={`px-1 py-0.5 rounded text-xs focus:ring-2 focus:ring-blue-500
-                  ${isDark
-                    ? 'bg-gray-700 border-gray-600 text-white'
-                    : 'bg-gray-50 border-gray-300 text-gray-900'
-                  } border`}
-                title={building.name}
+              <div
+                className={`flex rounded overflow-hidden border ${
+                  isDark ? 'border-gray-600' : 'border-gray-300'
+                }`}
               >
                 {Array.from({ length: building.maxLevel }, (_, i) => i + 1).map(
                   (lvl) => (
-                    <option key={lvl} value={lvl}>
-                      Lv{lvl}
-                    </option>
+                    <button
+                      key={lvl}
+                      onClick={() => setBuildingLevel(buildingId, lvl)}
+                      className={`w-6 h-6 text-[10px] font-medium transition-colors ${
+                        lvl === level
+                          ? 'bg-blue-600 text-white'
+                          : isDark
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            : 'bg-gray-50 text-gray-700 hover:bg-gray-200'
+                      }`}
+                      title={`${building.name} Level ${lvl}`}
+                    >
+                      {lvl}
+                    </button>
                   )
                 )}
-              </select>
+              </div>
             </div>
             <span className={`text-[10px] leading-tight ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
               {building.name}

@@ -9,6 +9,7 @@ import { BlueprintFlowView } from './components/BlueprintFlowView';
 import { SummaryTable } from './components/SummaryTable';
 import { OptimizationPanel } from './components/OptimizationPanel';
 import { ViewToggle } from './components/ViewToggle';
+import { FullscreenToggle } from './components/FullscreenToggle';
 import { ThemeToggle } from './components/ThemeToggle';
 import { ExportButton } from './components/ExportButton';
 import { CollapsibleSection } from './components/CollapsibleSection';
@@ -39,10 +40,10 @@ function ResetButton() {
   );
 }
 
-function StickyTargetSummary({ visible, isDark }: { visible: boolean; isDark: boolean }) {
+function StickyTargetSummary({ visible, isDark, isFullscreen, onExitFullscreen }: { visible: boolean; isDark: boolean; isFullscreen?: boolean; onExitFullscreen?: () => void }) {
   const targets = useStore((s) => s.targets);
 
-  if (!visible) return null;
+  if (!visible && !isFullscreen) return null;
 
   return (
     <div
@@ -52,7 +53,7 @@ function StickyTargetSummary({ visible, isDark }: { visible: boolean; isDark: bo
           : 'bg-white/95 border-gray-200'
       }`}
     >
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-1.5 flex items-center gap-4 overflow-x-auto">
+      <div className={`${isFullscreen ? '' : 'max-w-6xl mx-auto'} px-4 sm:px-6 py-1.5 flex items-center gap-4 overflow-x-auto`}>
         <span className={`text-xs font-medium shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Building</span>
         <div className="flex items-center gap-3 min-w-0">
           {targets.map((target, i) => {
@@ -70,6 +71,18 @@ function StickyTargetSummary({ visible, isDark }: { visible: boolean; isDark: bo
             );
           })}
         </div>
+        {isFullscreen && onExitFullscreen && (
+          <button
+            onClick={onExitFullscreen}
+            className={`ml-auto shrink-0 text-xs px-2 py-1 rounded transition ${
+              isDark
+                ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+            }`}
+          >
+            Exit Fullscreen
+          </button>
+        )}
       </div>
     </div>
   );
@@ -87,6 +100,7 @@ function AppContent() {
   // Track when TargetList scrolls out of view
   const targetListRef = useRef<HTMLDivElement>(null);
   const [showStickyBar, setShowStickyBar] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     const el = targetListRef.current;
@@ -98,6 +112,28 @@ function AppContent() {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  // Escape key exits fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsFullscreen(false);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isFullscreen]);
+
+  // Lock body scroll in fullscreen
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isFullscreen]);
 
   // Apply theme to document
   useEffect(() => {
@@ -112,99 +148,133 @@ function AppContent() {
 
   const isDark = theme === 'dark';
 
+  const handleEnterFullscreen = () => {
+    // Auto-open the section if collapsed
+    if (collapsedSections['Production View']) {
+      toggleSection('Production View');
+    }
+    setIsFullscreen(true);
+  };
+
+  const productionHeaderRight = (
+    <div className="flex items-center gap-2">
+      <ViewToggle />
+      <FullscreenToggle isFullscreen={isFullscreen} onToggle={isFullscreen ? () => setIsFullscreen(false) : handleEnterFullscreen} />
+    </div>
+  );
+
   return (
     <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
-      <StickyTargetSummary visible={showStickyBar} isDark={isDark} />
+      <StickyTargetSummary visible={showStickyBar || isFullscreen} isDark={isDark} isFullscreen={isFullscreen} onExitFullscreen={() => setIsFullscreen(false)} />
 
       {/* Header */}
-      <header className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b px-4 sm:px-6 py-3 sm:py-4`}>
-        <div className="max-w-6xl mx-auto flex flex-row items-center justify-between gap-4">
-          <div>
-            <h1 className={`text-xl sm:text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              Builderment Resource Calculator
-              <span className="ml-2 align-middle text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400 border border-amber-500/30 dark:border-amber-400/30" title="Under active development — things may change or break">
-                BETA
-              </span>
-            </h1>
-            <p className={`hidden sm:block text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-              Map out your entire production chain — under active development
-            </p>
+      {!isFullscreen && (
+        <header className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b px-4 sm:px-6 py-3 sm:py-4`}>
+          <div className="max-w-6xl mx-auto flex flex-row items-center justify-between gap-4">
+            <div>
+              <h1 className={`text-xl sm:text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                Builderment Resource Calculator
+                <span className="ml-2 align-middle text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400 border border-amber-500/30 dark:border-amber-400/30" title="Under active development — things may change or break">
+                  BETA
+                </span>
+              </h1>
+              <p className={`hidden sm:block text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                Map out your entire production chain — under active development
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <ResetButton />
+              <ExportButton />
+              <ThemeToggle />
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <ResetButton />
-            <ExportButton />
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Main content */}
-      <main className="py-4 sm:py-6">
+      <main className={isFullscreen ? '' : 'py-4 sm:py-6'}>
         {/* Zone 1: Constrained top */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div ref={targetListRef} className={`group/sticky ${isDark ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg p-2 sm:p-3 mb-4 sm:mb-6 shadow-sm`}>
-            <TargetList />
-          </div>
-
-          {bestPracticalRates && (
-            <div className="mb-4 sm:mb-6">
-              <CollapsibleSection title="Optimal Rates" isOpen={!collapsedSections['Optimal Rates']} onToggle={() => toggleSection('Optimal Rates')}>
-                <OptimizationPanel />
-              </CollapsibleSection>
+        {!isFullscreen && (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div ref={targetListRef} className={`group/sticky ${isDark ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg p-2 sm:p-3 mb-4 sm:mb-6 shadow-sm`}>
+              <TargetList />
             </div>
-          )}
-        </div>
 
-        {/* Zone 2: Full-width production view */}
-        <div className="px-4 sm:px-6 mb-4 sm:mb-6">
-          <CollapsibleSection title="Production View" isOpen={!collapsedSections['Production View']} onToggle={() => toggleSection('Production View')} headerRight={<ViewToggle />}>
-            {viewMode === 'tree' ? <ProductionTree /> : <BlueprintFlowView />}
+            {bestPracticalRates && (
+              <div className="mb-4 sm:mb-6">
+                <CollapsibleSection title="Optimal Rates" isOpen={!collapsedSections['Optimal Rates']} onToggle={() => toggleSection('Optimal Rates')}>
+                  <OptimizationPanel />
+                </CollapsibleSection>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Zone 2: Production view */}
+        <div className={
+          isFullscreen
+            ? `fixed inset-0 z-40 flex flex-col pt-10 ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`
+            : 'max-w-6xl mx-auto px-4 sm:px-6 mb-4 sm:mb-6'
+        }>
+          <CollapsibleSection
+            title="Production View"
+            isOpen={!collapsedSections['Production View']}
+            onToggle={() => toggleSection('Production View')}
+            headerRight={productionHeaderRight}
+            className={isFullscreen ? 'flex-1 flex flex-col' : undefined}
+            contentClassName={isFullscreen ? 'flex-1 flex flex-col' : undefined}
+          >
+            {viewMode === 'tree' ? <ProductionTree /> : <BlueprintFlowView isFullscreen={isFullscreen} />}
           </CollapsibleSection>
         </div>
 
         {/* Zone 3: Constrained bottom */}
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-4 sm:space-y-6">
-          {productionResult && (
-            <CollapsibleSection title="Raw Resources" subtitle="Total resources needed from the map" isOpen={!collapsedSections['Raw Resources']} onToggle={() => toggleSection('Raw Resources')}>
-              <SummaryTable />
-            </CollapsibleSection>
-          )}
-
-          <div className="lg:grid lg:grid-cols-2 lg:gap-6 space-y-2 sm:space-y-4 lg:space-y-0">
-            <div className="space-y-2 sm:space-y-4">
-              <CollapsibleSection title="Extractors" subtitle="Extractors needed for current production" isOpen={!collapsedSections['Extractors']} onToggle={() => toggleSection('Extractors')}>
-                <ResourceInput />
+        {!isFullscreen && (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-4 sm:space-y-6">
+            {productionResult && (
+              <CollapsibleSection title="Raw Resources" subtitle="Total resources needed from the map" isOpen={!collapsedSections['Raw Resources']} onToggle={() => toggleSection('Raw Resources')}>
+                <SummaryTable />
               </CollapsibleSection>
+            )}
 
-              <CollapsibleSection title="Settings" subtitle="Belt tier and display options" isOpen={!collapsedSections['Settings']} onToggle={() => toggleSection('Settings')}>
-                <SettingsSection />
-              </CollapsibleSection>
-            </div>
+            <div className="lg:grid lg:grid-cols-2 lg:gap-6 space-y-2 sm:space-y-4 lg:space-y-0">
+              <div className="space-y-2 sm:space-y-4">
+                <CollapsibleSection title="Extractors" subtitle="Extractors needed for current production" isOpen={!collapsedSections['Extractors']} onToggle={() => toggleSection('Extractors')}>
+                  <ResourceInput />
+                </CollapsibleSection>
 
-            <div className="space-y-2 sm:space-y-4">
-              <CollapsibleSection title="Recipes" subtitle="Choose alternate recipes for items" isOpen={!collapsedSections['Recipes']} onToggle={() => toggleSection('Recipes')}>
-                <RecipePickerList />
-              </CollapsibleSection>
+                <CollapsibleSection title="Settings" subtitle="Belt tier and display options" isOpen={!collapsedSections['Settings']} onToggle={() => toggleSection('Settings')}>
+                  <SettingsSection />
+                </CollapsibleSection>
+              </div>
 
-              <CollapsibleSection title="Recipe Book" subtitle="Verify recipe data" isOpen={!collapsedSections['Recipe Book']} onToggle={() => toggleSection('Recipe Book')}>
-                <RecipeBook />
-              </CollapsibleSection>
+              <div className="space-y-2 sm:space-y-4">
+                <CollapsibleSection title="Recipes" subtitle="Choose alternate recipes for items" isOpen={!collapsedSections['Recipes']} onToggle={() => toggleSection('Recipes')}>
+                  <RecipePickerList />
+                </CollapsibleSection>
+
+                <CollapsibleSection title="Recipe Book" subtitle="Verify recipe data" isOpen={!collapsedSections['Recipe Book']} onToggle={() => toggleSection('Recipe Book')}>
+                  <RecipeBook />
+                </CollapsibleSection>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* Footer */}
-      <footer className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-t px-4 sm:px-6 py-4 mt-4 sm:mt-8`}>
-        <div className={`max-w-6xl mx-auto text-center ${isDark ? 'text-gray-400' : 'text-gray-600'} text-xs sm:text-sm`}>
-          <p>
-            Builderment Resource Calculator — Factory planning made simple
-          </p>
-          <p className={`hidden sm:block mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-            Data based on Builderment game. Not affiliated with Builderment or its developers.
-          </p>
-        </div>
-      </footer>
+      {!isFullscreen && (
+        <footer className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-t px-4 sm:px-6 py-4 mt-4 sm:mt-8`}>
+          <div className={`max-w-6xl mx-auto text-center ${isDark ? 'text-gray-400' : 'text-gray-600'} text-xs sm:text-sm`}>
+            <p>
+              Builderment Resource Calculator — Factory planning made simple
+            </p>
+            <p className={`hidden sm:block mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+              Data based on Builderment game. Not affiliated with Builderment or its developers.
+            </p>
+          </div>
+        </footer>
+      )}
     </div>
   );
 }

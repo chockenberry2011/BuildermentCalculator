@@ -9,6 +9,8 @@ interface CollapsibleSectionProps {
   isOpen?: boolean;
   onToggle?: () => void;
   headerRight?: React.ReactNode;
+  className?: string;
+  contentClassName?: string;
 }
 
 export function CollapsibleSection({
@@ -19,6 +21,8 @@ export function CollapsibleSection({
   isOpen: controlledIsOpen,
   onToggle,
   headerRight,
+  className,
+  contentClassName,
 }: CollapsibleSectionProps) {
   const theme = useStore((s) => s.theme);
   const isDark = theme === 'dark';
@@ -45,7 +49,7 @@ export function CollapsibleSection({
   const cardClasses = `${isDark ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg p-3 sm:p-4`;
 
   return (
-    <div>
+    <div className={className}>
       <div
         className={`${cardClasses} cursor-pointer flex items-center justify-between select-none ${isOpen ? 'rounded-b-none' : ''}`}
         role="button"
@@ -80,7 +84,7 @@ export function CollapsibleSection({
         </svg>
       </div>
       {isOpen && (
-        <div className={`${cardClasses} rounded-t-none border-t-0`}>
+        <div className={`${cardClasses} rounded-t-none border-t-0 ${contentClassName ?? ''}`}>
           {children}
         </div>
       )}

@@ -1,6 +1,8 @@
 import { useStore } from '../store/useStore';
 import { ITEMS } from '../data/items';
 import { EXTRACTOR_RATES } from '../data/buildings';
+import { StepperButton } from './StepperButton';
+import { ResourceIcon } from './ResourceIcon';
 
 export function ResourceInput() {
   const productionResult = useStore((s) => s.productionResult);
@@ -41,12 +43,20 @@ export function ResourceInput() {
           const item = ITEMS[resourceId];
           const isConstraint = constraintSource.type === 'extractor' && constraintSource.resourceId === resourceId;
 
+          const step = (delta: number) => {
+            const next = Math.max(1, extractorCount + delta);
+            setRateFromExtractorCount(resourceId, next);
+          };
+
           return (
             <div
               key={resourceId}
-              className={`p-2 rounded ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}
+              className={`p-2 rounded-lg border ${
+                isDark ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-200'
+              }`}
             >
               <div className="flex items-center gap-2">
+                <ResourceIcon resourceId={resourceId} />
                 <span className={`flex-1 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
                   {item?.name ?? resourceId}
                   {isConstraint && (
@@ -55,23 +65,27 @@ export function ResourceInput() {
                     </span>
                   )}
                 </span>
-                <input
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={parseFloat(extractorCount.toFixed(2))}
-                  onChange={(e) => {
-                    const count = parseFloat(e.target.value);
-                    if (count > 0) {
-                      setRateFromExtractorCount(resourceId, count);
-                    }
-                  }}
-                  className={`w-20 px-2 py-1 rounded text-center ${
-                    isDark
-                      ? 'bg-gray-600 border-gray-500 text-white'
-                      : 'bg-white border-gray-300 text-gray-900'
-                  } border`}
-                />
+                <div className="flex items-center gap-0.5">
+                  <StepperButton direction="decrement" onClick={() => step(-1)} isDark={isDark} />
+                  <input
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={parseFloat(extractorCount.toFixed(2))}
+                    onChange={(e) => {
+                      const count = parseFloat(e.target.value);
+                      if (count > 0) {
+                        setRateFromExtractorCount(resourceId, count);
+                      }
+                    }}
+                    className={`w-20 px-2 py-1 rounded-lg text-center ${
+                      isDark
+                        ? 'bg-gray-600 border-gray-500 text-white'
+                        : 'bg-white border-gray-300 text-gray-900'
+                    } border focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                  />
+                  <StepperButton direction="increment" onClick={() => step(1)} isDark={isDark} />
+                </div>
                 <span className={`text-xs whitespace-nowrap ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                   {rate.toFixed(2)}/min
                 </span>

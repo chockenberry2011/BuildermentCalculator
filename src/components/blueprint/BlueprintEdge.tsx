@@ -16,6 +16,7 @@ import { BadgePopover } from '../BadgePopover';
 import { useZoomLevel } from '../../hooks/useZoomLevel';
 import type { BuildingType } from '../../data/buildings';
 import { traceSplitterPath, type SplitterTreeInfo, type SplitterTarget } from '../../core/splitterTree';
+import { WiringDiagramSection } from '../WiringDiagram';
 
 export interface BlueprintEdgeData {
   flatEdge: FlatEdge;
@@ -34,6 +35,12 @@ export interface BlueprintEdgeData {
   sourceBuildingName: string | null;
   /** Whether the source node is a raw resource */
   sourceIsRaw: boolean;
+  /** Building count of the target node */
+  targetBuildingCount: Rational | null;
+  /** Building type of the target node (e.g. 'workshop') */
+  targetBuildingType: string | null;
+  /** Building name of the target node (e.g. 'Workshop') */
+  targetBuildingName: string | null;
   /** Where along the edge (0–1) the bend occurs; 0.5 = centered (default) */
   stepPosition: number;
   /** Splitter tree info for edges from multi-consumer source nodes */
@@ -78,7 +85,7 @@ export const BlueprintEdge = memo(function BlueprintEdge({
 
   if (!data) return null;
 
-  const { flatEdge, beltStatus, beltsNeeded, utilization, maxRate, isDark, isDimmed, sourceBuildingCount, sourceTotalRate, sourceBuildingType, sourceBuildingName, sourceIsRaw, stepPosition, splitterTree } = data;
+  const { flatEdge, beltStatus, beltsNeeded, utilization, maxRate, isDark, isDimmed, sourceBuildingCount, sourceTotalRate, sourceBuildingType, sourceBuildingName, sourceIsRaw, targetBuildingCount, targetBuildingType, targetBuildingName: _targetBuildingName, stepPosition, splitterTree } = data;
   const rate = flatEdge.rate.toNumber();
   const itemColor = getItemColor(flatEdge.fromItemId);
   const statusColor = STATUS_COLORS[beltStatus];
@@ -188,6 +195,15 @@ export const BlueprintEdge = memo(function BlueprintEdge({
       ? getBeltDistribution(buildingShare, beltsNeeded)
       : null;
 
+  // Target-side distribution: how many target buildings each belt serves
+  const targetDistribution =
+    beltStatus === 'multi-belt' && targetBuildingCount
+      ? getBeltDistribution(targetBuildingCount, beltsNeeded)
+      : null;
+
+  // Per-belt throughput
+  const perBeltRate = beltsNeeded > 1 ? rate / beltsNeeded : null;
+
   // Format building share for display
   const shareValue = buildingShare ? buildingShare.toNumber() : null;
   const shareText = shareValue !== null
@@ -238,6 +254,12 @@ export const BlueprintEdge = memo(function BlueprintEdge({
         <span className={labelClass}>Utilization</span>
         <span className="font-medium">{utilizationPct}%</span>
       </div>
+      {perBeltRate !== null && (
+        <div className="flex justify-between">
+          <span className={labelClass}>Per belt</span>
+          <span className="font-medium">{formatRate(perBeltRate)}/min</span>
+        </div>
+      )}
       {beltStatus !== 'ok' && (
         <>
           <div className={`border-t my-2 ${dividerClass}`} />
@@ -249,18 +271,47 @@ export const BlueprintEdge = memo(function BlueprintEdge({
           </div>
         </>
       )}
-      {distribution && (
+      {(distribution || targetDistribution) && (
         <>
           <div className={`border-t my-2 ${dividerClass}`} />
           <div className={`${labelClass} mb-1`}>Distribution per belt</div>
-          <div className="font-medium">{distribution.shortLabel}</div>
-          {distribution.splitInfo && (
-            <div className={`${labelClass} text-[11px]`}>
-              {distribution.splitInfo.fullBuildings} full + {distribution.splitInfo.splitNumerator}/{distribution.splitInfo.splitDenominator} split
+          {distribution && (
+            <>
+              <div className="font-medium flex items-center gap-1">
+                {sourceBuildingType && (
+                  <BuildingIcon buildingType={sourceBuildingType as BuildingType} size="sm" />
+                )}
+                Source: {distribution.shortLabel}
+              </div>
+              {distribution.splitInfo && (
+                <div className={`${labelClass} text-[11px] ml-5`}>
+                  {distribution.splitInfo.fullBuildings} full + {distribution.splitInfo.splitNumerator}/{distribution.splitInfo.splitDenominator} split
+                </div>
+              )}
+            </>
+          )}
+          {targetDistribution && (
+            <div className="font-medium flex items-center gap-1">
+              {targetBuildingType && (
+                <BuildingIcon buildingType={targetBuildingType as BuildingType} size="sm" />
+              )}
+              Target: {targetDistribution.shortLabel}
             </div>
           )}
         </>
       )}
+      <WiringDiagramSection
+        distribution={distribution}
+        targetDistribution={targetDistribution}
+        sourceBuildingType={sourceBuildingType}
+        targetBuildingType={targetBuildingType}
+        buildingShare={buildingShare}
+        targetBuildingCount={targetBuildingCount}
+        beltsNeeded={beltsNeeded}
+        isDark={isDark}
+        labelClass={labelClass}
+        dividerClass={dividerClass}
+      />
       {splitterTree && splitterTree.ratioParts.length >= 2 && (() => {
         const targetLabel = flatEdge.toItemName;
         const path = splitterTree.isSplitterFriendly

@@ -215,6 +215,8 @@ function buildReactFlowData(
     const key = `${flatEdge.fromNodeKey}->${flatEdge.toNodeKey}`;
     const sourceNode = nodeInfoMap.get(flatEdge.fromNodeKey);
     const srcBuilding = sourceNode?.building ?? null;
+    const targetNode = nodeInfoMap.get(flatEdge.toNodeKey);
+    const tgtBuilding = targetNode?.building ?? null;
 
     return {
       id: key,
@@ -235,6 +237,9 @@ function buildReactFlowData(
         sourceBuildingType: srcBuilding?.buildingType ?? null,
         sourceBuildingName: srcBuilding ? (BUILDINGS[srcBuilding.buildingType]?.name ?? null) : null,
         sourceIsRaw: sourceNode?.isRaw ?? false,
+        targetBuildingCount: tgtBuilding?.count ?? null,
+        targetBuildingType: tgtBuilding?.buildingType ?? null,
+        targetBuildingName: tgtBuilding ? (BUILDINGS[tgtBuilding.buildingType]?.name ?? null) : null,
         stepPosition: stepPositions.get(key) ?? 0.5,
         splitterTree: splitterTrees.get(flatEdge.fromNodeKey) ?? null,
       } satisfies BlueprintEdgeData,
@@ -414,6 +419,7 @@ function BlueprintFlowInner({
   hasProgress,
   onClearProgress,
   onNodePositionChange,
+  isFullscreen,
 }: {
   initialNodes: Node[];
   initialEdges: Edge[];
@@ -430,6 +436,7 @@ function BlueprintFlowInner({
   hasProgress: boolean;
   onClearProgress: () => void;
   onNodePositionChange: (nodeKey: string, position: { x: number; y: number }) => void;
+  isFullscreen?: boolean;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -552,6 +559,9 @@ function BlueprintFlowInner({
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
+        if (selectedNodeId) {
+          e.stopPropagation();
+        }
         setSelectedNodeId(null);
         return;
       }
@@ -625,8 +635,8 @@ function BlueprintFlowInner({
     <div
       ref={containerRef}
       tabIndex={0}
-      className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} rounded-lg overflow-hidden outline-none`}
-      style={{ height: `${estimatedHeight}px` }}
+      className={`${isDark ? 'bg-gray-900' : 'bg-gray-50'} rounded-lg overflow-hidden outline-none ${isFullscreen ? 'flex-1' : ''}`}
+      style={isFullscreen ? { height: '100%' } : { height: `${estimatedHeight}px` }}
     >
       <ReactFlow
         nodes={nodes}
@@ -673,7 +683,7 @@ function BlueprintFlowInner({
   );
 }
 
-export function BlueprintFlowView() {
+export function BlueprintFlowView({ isFullscreen }: { isFullscreen?: boolean } = {}) {
   const productionResult = useStore((s) => s.productionResult);
   const beltSpeed = useStore((s) => s.beltSpeed);
   const theme = useStore((s) => s.theme);
@@ -824,6 +834,7 @@ export function BlueprintFlowView() {
         hasProgress={blueprintProgress.size > 0}
         onClearProgress={clearBlueprintProgress}
         onNodePositionChange={handleNodePositionChange}
+        isFullscreen={isFullscreen}
       />
     </ReactFlowProvider>
   );
