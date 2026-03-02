@@ -317,6 +317,108 @@ function splitNonFriendlyNodes(
     }
   }
 
+  // Fixup: rewire edges that reference removed nodes due to cascading splits.
+  // When both A and B are split, A's split creates "A_for_B -> B" (B removed) and
+  // B's split creates "A -> B_for_C" (A removed). Fix these to "A_for_B -> B_for_C".
+  if (removedNodeKeys.size > 0) {
+    // Map from removed nodeKey to its dedicated copies
+    const dedicatedCopiesOf = new Map<string, FlatNode[]>();
+    for (const node of newNodes) {
+      if (node.consumerItemId) {
+        const originalKey = node.itemId; // the removed node's original key
+        if (removedNodeKeys.has(originalKey)) {
+          const list = dedicatedCopiesOf.get(originalKey) ?? [];
+          list.push(node);
+          dedicatedCopiesOf.set(originalKey, list);
+        }
+      }
+    }
+
+    const fixedEdges: FlatEdge[] = [];
+    for (const edge of newEdges) {
+      const fromBroken = removedNodeKeys.has(edge.fromNodeKey);
+      const toBroken = removedNodeKeys.has(edge.toNodeKey);
+
+      if (!fromBroken && !toBroken) {
+        fixedEdges.push(edge);
+      } else if (fromBroken && !toBroken) {
+        // Source was split. Find the dedicated copy created for the target's original item.
+        // e.g., edge "wood_log -> graphite_for_carbon_fiber" → find "wood_log_for_graphite"
+        // because graphite_for_carbon_fiber's itemId is "graphite"
+        const toNode = newNodes.find(n => n.nodeKey === edge.toNodeKey);
+        const targetItemId = toNode?.itemId ?? edge.toItemId;
+        const dedicatedKey = `${edge.fromNodeKey}_for_${targetItemId}`;
+        const dedicatedNode = newNodes.find(n => n.nodeKey === dedicatedKey);
+        if (dedicatedNode) {
+          fixedEdges.push({ ...edge, fromNodeKey: dedicatedKey });
+        }
+        // else: drop the edge (shouldn't happen in practice)
+      } else if (!fromBroken && toBroken) {
+        // Target was split. Replace with edges to each dedicated copy, proportionally.
+        // e.g., edge "wood_log_for_graphite -> graphite" → replace with edges to
+        // "graphite_for_carbon_fiber" and "graphite_for_tungsten_carbide"
+        const copies = dedicatedCopiesOf.get(edge.toNodeKey) ?? [];
+        let totalCopyRate = Rational.zero();
+        for (const copy of copies) {
+          totalCopyRate = totalCopyRate.add(copy.totalRate);
+        }
+        for (const copy of copies) {
+          if (!totalCopyRate.isZero()) {
+            const fraction = copy.totalRate.divide(totalCopyRate);
+            fixedEdges.push({
+              ...edge,
+              toNodeKey: copy.nodeKey,
+              rate: edge.rate.multiply(fraction),
+              toItemName: copy.consumerItemName ?? copy.itemName,
+            });
+          }
+        }
+      } else {
+        // Both broken. Find the correct dedicated source and split across dedicated targets.
+        const toNode = newNodes.find(n => n.nodeKey === edge.toNodeKey);
+        const targetItemId = toNode?.itemId ?? edge.toItemId;
+        const dedicatedFromKey = `${edge.fromNodeKey}_for_${targetItemId}`;
+        const dedicatedFrom = newNodes.find(n => n.nodeKey === dedicatedFromKey);
+        const copies = dedicatedCopiesOf.get(edge.toNodeKey) ?? [];
+        if (dedicatedFrom && copies.length > 0) {
+          let totalCopyRate = Rational.zero();
+          for (const copy of copies) {
+            totalCopyRate = totalCopyRate.add(copy.totalRate);
+          }
+          for (const copy of copies) {
+            if (!totalCopyRate.isZero()) {
+              const fraction = copy.totalRate.divide(totalCopyRate);
+              fixedEdges.push({
+                ...edge,
+                fromNodeKey: dedicatedFromKey,
+                toNodeKey: copy.nodeKey,
+                rate: edge.rate.multiply(fraction),
+                toItemName: copy.consumerItemName ?? copy.itemName,
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Deduplicate edges that may have been created by both sides of a cascading split
+    const edgeDedup = new Map<string, FlatEdge>();
+    for (const edge of fixedEdges) {
+      const key = `${edge.fromNodeKey}->${edge.toNodeKey}`;
+      const existing = edgeDedup.get(key);
+      if (existing) {
+        // Keep the one with the larger rate (from the more specific split)
+        if (edge.rate.toNumber() > existing.rate.toNumber()) {
+          edgeDedup.set(key, edge);
+        }
+      } else {
+        edgeDedup.set(key, edge);
+      }
+    }
+
+    return { nodes: newNodes, edges: Array.from(edgeDedup.values()) };
+  }
+
   return { nodes: newNodes, edges: newEdges };
 }
 

@@ -2,6 +2,7 @@
  * Compact SVG icons for raw resources.
  */
 
+import { EXTRACTOR_COLORS } from './BuildingIcon';
 import { getItemColor } from '../data/itemColors';
 
 function IconWoodLog({ color }: { color: string }) {
@@ -88,7 +89,7 @@ export function ResourceIcon({ resourceId, className = '' }: ResourceIconProps) 
   const IconComponent = ICON_COMPONENTS[resourceId];
   if (!IconComponent) return null;
 
-  const color = getItemColor(resourceId);
+  const color = EXTRACTOR_COLORS[resourceId] ?? getItemColor(resourceId);
 
   return (
     <svg

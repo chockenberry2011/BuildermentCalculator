@@ -40,10 +40,10 @@ const DEFAULT_RECIPES: Recipe[] = [
   {
     id: 'copper_wire',
     outputId: 'copper_wire',
-    outputQuantity: 1,
+    outputQuantity: 2,
     building: 'workshop',
     craftTime: 2,
-    ingredients: [{ itemId: 'copper_ingot', quantity: 1.5 }],
+    ingredients: [{ itemId: 'copper_ingot', quantity: 3 }],
     isAlternate: false,
   },
   {
@@ -58,10 +58,10 @@ const DEFAULT_RECIPES: Recipe[] = [
   {
     id: 'iron_plating',
     outputId: 'iron_plating',
-    outputQuantity: 1,
+    outputQuantity: 2,
     building: 'workshop',
     craftTime: 3,
-    ingredients: [{ itemId: 'iron_ingot', quantity: 2 }],
+    ingredients: [{ itemId: 'iron_ingot', quantity: 4 }],
     isAlternate: false,
   },
   {
@@ -121,10 +121,10 @@ const DEFAULT_RECIPES: Recipe[] = [
   {
     id: 'particle_glue',
     outputId: 'particle_glue',
-    outputQuantity: 1,
+    outputQuantity: 10,
     building: 'workshop',
     craftTime: 3,
-    ingredients: [{ itemId: 'matter_compressor', quantity: 0.1 }],
+    ingredients: [{ itemId: 'matter_compressor', quantity: 1 }],
     isAlternate: false,
   },
   {

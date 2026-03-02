@@ -234,6 +234,50 @@ describe('flattenToDAG hybrid mode', () => {
   });
 });
 
+describe('flattenToDAG cascading splits', () => {
+  it('all edges reference existing nodes (no orphaned edges)', () => {
+    // super_computer has cascading splits: wood_log feeds graphite (which also splits)
+    const result = calculateProduction('super_computer', 2, noRecipes, defaultLevels);
+    for (const mode of ['dedicated', 'hybrid'] as const) {
+      const dag = flattenToDAG(result, mode);
+      const nodeKeys = new Set(dag.nodes.map((n) => n.nodeKey));
+
+      for (const edge of dag.edges) {
+        expect(nodeKeys.has(edge.fromNodeKey)).toBe(true);
+        expect(nodeKeys.has(edge.toNodeKey)).toBe(true);
+      }
+    }
+  });
+
+  it('no nodes are orphaned (every non-root has incoming, every non-raw has outgoing)', () => {
+    const result = calculateProduction('super_computer', 2, noRecipes, defaultLevels);
+    for (const mode of ['dedicated', 'hybrid'] as const) {
+      const dag = flattenToDAG(result, mode);
+      const nodeKeys = new Set(dag.nodes.map((n) => n.nodeKey));
+      const hasIncoming = new Set<string>();
+      const hasOutgoing = new Set<string>();
+
+      for (const edge of dag.edges) {
+        if (nodeKeys.has(edge.toNodeKey)) hasIncoming.add(edge.toNodeKey);
+        if (nodeKeys.has(edge.fromNodeKey)) hasOutgoing.add(edge.fromNodeKey);
+      }
+
+      for (const node of dag.nodes) {
+        // Raw resources have no incoming edges — that's fine
+        // But non-raw nodes should have at least one incoming edge
+        if (!node.isRaw) {
+          expect(hasIncoming.has(node.nodeKey)).toBe(true);
+        }
+        // Root node (super_computer) has no outgoing edges — that's fine
+        // But non-root nodes should have at least one outgoing edge
+        if (node.nodeKey !== 'super_computer') {
+          expect(hasOutgoing.has(node.nodeKey)).toBe(true);
+        }
+      }
+    }
+  });
+});
+
 describe('layoutDAG', () => {
   it('assigns positions to all nodes', () => {
     const result = calculateProduction('turbocharger', 1, noRecipes, defaultLevels);

@@ -149,7 +149,7 @@ function MiniNodePopoverContent({
           <div className="flex justify-between items-center">
             <span className={labelClass}>Building</span>
             <span className="font-medium flex items-center gap-1">
-              <BuildingIcon buildingType={buildingType} size="sm" />
+              <BuildingIcon buildingType={buildingType} itemId={flatNode.itemId} size="sm" />
               {buildingName}
               {building && building.level > 1 ? ` Lv${building.level}` : ''}
             </span>
@@ -420,7 +420,7 @@ function FullNode({
         {/* Building info */}
         {count && (
           <div className={`mt-1.5 pt-1 flex items-center gap-1.5 border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-            <BuildingIcon buildingType={buildingType} size="md" />
+            <BuildingIcon buildingType={buildingType} itemId={flatNode.itemId} size="md" />
             <span
               className="text-sm font-semibold"
               style={{ color: getCountColor(fractionSimplicityScore(building!.count), isDark) }}
@@ -433,8 +433,8 @@ function FullNode({
             </span>
           </div>
         )}
-        {count && !count.isInteger && (
-          <SplitBadge count={building!.count} variant="line" isDark={isDark} />
+        {count && !count.isInteger && !isRoot && (
+          <SplitBadge count={building!.count} isDark={isDark} outputQuantity={flatNode.recipe?.outputQuantity} />
         )}
         {building && building.level < building.configuredLevel && (
           <LevelBadge building={building} isDark={isDark} />

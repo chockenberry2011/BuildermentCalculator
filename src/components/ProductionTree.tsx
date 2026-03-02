@@ -102,7 +102,7 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
               onSetCount={(newCount) => setRateFromItemBuildingCount(node.itemId, newCount)}
               isDark={isDark}
             />
-            <BuildingIcon buildingType={buildingInfo.buildingType} />
+            <BuildingIcon buildingType={buildingInfo.buildingType} itemId={node.itemId} />
             <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
               {buildingName}
               {buildingInfo.level > 1 && (
@@ -123,8 +123,8 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
           />
         )}
 
-        {buildingInfo && !buildingInfo.count.isInteger() && (
-          <SplitBadge count={buildingInfo.count} isDark={isDark} />
+        {buildingInfo && !buildingInfo.count.isInteger() && depth > 0 && (
+          <SplitBadge count={buildingInfo.count} isDark={isDark} outputQuantity={node.recipe?.outputQuantity} />
         )}
 
         {buildingInfo && buildingInfo.level < buildingInfo.configuredLevel && (

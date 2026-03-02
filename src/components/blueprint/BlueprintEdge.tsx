@@ -234,7 +234,7 @@ export const BlueprintEdge = memo(function BlueprintEdge({
             </span>
             <span className="font-medium flex items-center gap-1">
               {sourceBuildingType && (
-                <BuildingIcon buildingType={sourceBuildingType as BuildingType} size="sm" />
+                <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={flatEdge.fromItemId} size="sm" />
               )}
               {shareText} of {totalBuildingText}
             </span>
@@ -279,7 +279,7 @@ export const BlueprintEdge = memo(function BlueprintEdge({
             <>
               <div className="font-medium flex items-center gap-1">
                 {sourceBuildingType && (
-                  <BuildingIcon buildingType={sourceBuildingType as BuildingType} size="sm" />
+                  <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={flatEdge.fromItemId} size="sm" />
                 )}
                 Source: {distribution.shortLabel}
               </div>
@@ -293,7 +293,7 @@ export const BlueprintEdge = memo(function BlueprintEdge({
           {targetDistribution && (
             <div className="font-medium flex items-center gap-1">
               {targetBuildingType && (
-                <BuildingIcon buildingType={targetBuildingType as BuildingType} size="sm" />
+                <BuildingIcon buildingType={targetBuildingType as BuildingType} itemId={flatEdge.toItemId} size="sm" />
               )}
               Target: {targetDistribution.shortLabel}
             </div>

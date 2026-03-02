@@ -11,8 +11,21 @@ export const BUILDING_COLORS: Record<BuildingType, string> = {
   earth_teleporter: '#14B8A6', // teal
 };
 
+/** Per-resource extractor colors matching in-game visuals */
+export const EXTRACTOR_COLORS: Record<string, string> = {
+  wood_log: '#4AA84B',        // green
+  stone: '#9CA3AF',           // grey/silver
+  iron_ore: '#60A5FA',        // light blue
+  copper_ore: '#E07830',      // orange
+  coal: '#374151',            // black/dark
+  wolframite: '#9B2D5B',      // burgundy
+  gold_ore: '#D4A017',        // gold
+  uranium: '#86EFAC',         // light green
+};
+
 interface BuildingIconProps {
   buildingType: BuildingType;
+  itemId?: string;
   size?: 'sm' | 'md';
   className?: string;
 }
@@ -180,8 +193,10 @@ const ICON_COMPONENTS: Record<BuildingType, React.FC<{ color: string }>> = {
   earth_teleporter: IconEarthTeleporter,
 };
 
-export function BuildingIcon({ buildingType, size = 'sm', className = '' }: BuildingIconProps) {
-  const color = BUILDING_COLORS[buildingType] ?? '#6B7280';
+export function BuildingIcon({ buildingType, itemId, size = 'sm', className = '' }: BuildingIconProps) {
+  const color = (buildingType === 'extractor' && itemId && EXTRACTOR_COLORS[itemId])
+    ? EXTRACTOR_COLORS[itemId]
+    : BUILDING_COLORS[buildingType] ?? '#6B7280';
   const name = BUILDINGS[buildingType]?.name ?? buildingType;
   const px = SIZES[size];
   const IconComponent = ICON_COMPONENTS[buildingType];

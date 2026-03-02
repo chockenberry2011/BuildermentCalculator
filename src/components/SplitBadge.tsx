@@ -35,10 +35,11 @@ interface SplitBadgeProps {
   count: Rational;
   variant?: 'pill' | 'line';
   isDark?: boolean;
+  outputQuantity?: number;
 }
 
-export function SplitBadge({ count, variant = 'pill', isDark = false }: SplitBadgeProps) {
-  const info = getSplitInfo(count);
+export function SplitBadge({ count, variant = 'pill', isDark = false, outputQuantity }: SplitBadgeProps) {
+  const info = getSplitInfo(count, outputQuantity);
   if (!info) return null;
 
   const score = fractionSimplicityScore(count);
@@ -64,7 +65,8 @@ export function SplitBadge({ count, variant = 'pill', isDark = false }: SplitBad
   const dividerClass = isDark ? 'border-gray-600' : 'border-gray-200';
   const labelClass = isDark ? 'text-gray-400' : 'text-gray-500';
 
-  const tooltipText = `Build ${info.actualBuildings}: ${info.fullBuildings} full + 1 splits ${info.splitNumerator}/${info.splitDenominator}`;
+  const batchSuffix = outputQuantity && outputQuantity > 1 ? ` (batch of ${outputQuantity})` : '';
+  const tooltipText = `Build ${info.actualBuildings}: ${info.fullBuildings} full + 1 splits ${info.splitNumerator}/${info.splitDenominator}${batchSuffix}`;
 
   const popoverDetail = (
     <div className="space-y-1.5">
@@ -81,6 +83,12 @@ export function SplitBadge({ count, variant = 'pill', isDark = false }: SplitBad
         <span className={labelClass}>Split ratio</span>
         <span className="font-medium">{info.splitNumerator}/{info.splitDenominator}</span>
       </div>
+      {outputQuantity && outputQuantity > 1 && (
+        <div className="flex justify-between">
+          <span className={labelClass}>Batch size</span>
+          <span className="font-medium">{outputQuantity} per craft</span>
+        </div>
+      )}
       <div className={`border-t my-2 ${dividerClass}`} />
       <div className="flex justify-between items-center">
         <span className={labelClass}>Simplicity</span>
@@ -112,11 +120,11 @@ export function SplitBadge({ count, variant = 'pill', isDark = false }: SplitBad
   }
 
   // Pill variant — compact with popover
-  const compactLabel = count.toNumber().toFixed(2);
+  const compactLabel = info.shortLabel;
 
   const pill = (
     <span
-      className={`inline-flex items-center gap-0.5 whitespace-nowrap flex-shrink-0 text-xs px-1.5 py-0.5 rounded ml-1.5 ${pillStyles[tier]}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded mt-1 ${pillStyles[tier]}`}
       style={pillBg ? { backgroundColor: pillBg } : undefined}
     >
       <SplitIcon size={12} color={iconColors[tier]} />
