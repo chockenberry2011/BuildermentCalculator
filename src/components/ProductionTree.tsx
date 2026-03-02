@@ -7,6 +7,7 @@ import { BuildingIcon } from './BuildingIcon';
 import { BeltBadge } from './BeltBadge';
 import { EditableBuildingCount } from './EditableBuildingCount';
 import { SplitBadge } from './SplitBadge';
+import { LevelBadge } from './LevelBadge';
 
 interface TreeNodeProps {
   node: ProductionNode;
@@ -124,6 +125,10 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
 
         {buildingInfo && !buildingInfo.count.isInteger() && (
           <SplitBadge count={buildingInfo.count} isDark={isDark} />
+        )}
+
+        {buildingInfo && buildingInfo.level < buildingInfo.configuredLevel && (
+          <LevelBadge building={buildingInfo} isDark={isDark} />
         )}
       </div>
 

@@ -6,7 +6,8 @@ import { Rational } from './math/rational';
 export interface BuildingRequirement {
   buildingType: BuildingType;
   count: Rational;
-  level: number;
+  level: number;              // effective level (auto-optimized if possible)
+  configuredLevel: number;    // the global setting from buildingLevels
 }
 
 export interface ProductionNode {
@@ -61,7 +62,7 @@ function getSelectedRecipe(itemId: string, selections: RecipeSelections): Recipe
   return getDefaultRecipe(itemId) ?? null;
 }
 
-function calculateBuildingCount(
+export function calculateBuildingCount(
   ratePerMinute: Rational,
   recipe: Recipe,
   buildingLevel: number
@@ -76,12 +77,34 @@ function calculateBuildingCount(
   return ratePerMinute.divide(Rational.fromNumber(outputPerBuildingPerMinute));
 }
 
-function calculateExtractorCount(
+export function calculateExtractorCount(
   ratePerMinute: Rational,
   extractorLevel: number
 ): Rational {
   const outputPerExtractor = EXTRACTOR_RATES[extractorLevel - 1];
   return ratePerMinute.divide(Rational.fromNumber(outputPerExtractor));
+}
+
+/**
+ * Find the highest building level below `configuredLevel` that yields an integer building count.
+ * Returns undefined if no such level exists or if the count is already integer.
+ */
+export function findOptimalLevel(
+  ratePerMinute: Rational,
+  recipe: Recipe | null,
+  buildingType: BuildingType,
+  configuredLevel: number
+): number | undefined {
+  if (configuredLevel <= 1) return undefined;
+  if (buildingType === 'earth_teleporter') return undefined;
+
+  for (let level = configuredLevel - 1; level >= 1; level--) {
+    const count = recipe
+      ? calculateBuildingCount(ratePerMinute, recipe, level)
+      : calculateExtractorCount(ratePerMinute, level);
+    if (count.isInteger()) return level;
+  }
+  return undefined;
 }
 
 export function calculateProduction(
@@ -104,17 +127,37 @@ export function calculateProduction(
     rawResources.set(itemId, existing.add(rate));
   }
 
+  let totalPowerAccum = 0;
+  function addPower(buildingType: BuildingType, count: Rational, effectiveLevel: number) {
+    const info = BUILDINGS[buildingType];
+    if (info) {
+      const idx = Math.min(effectiveLevel, info.maxLevel) - 1;
+      const powerPerBuilding = info.powerConsumption[idx];
+      totalPowerAccum += Math.ceil(count.toNumber()) * powerPerBuilding;
+    }
+  }
+
   function buildNode(itemId: string, ratePerMinute: Rational): ProductionNode {
     const item = ITEMS[itemId];
     const itemName = item?.name ?? itemId;
 
     // Check if raw resource
     if (isRawResource(itemId)) {
-      const extractorLevel = buildingLevels.get('extractor') ?? 1;
-      const extractorCount = calculateExtractorCount(ratePerMinute, extractorLevel);
+      const configuredLevel = buildingLevels.get('extractor') ?? 1;
+      let effectiveLevel = configuredLevel;
+      let extractorCount = calculateExtractorCount(ratePerMinute, configuredLevel);
+
+      if (!extractorCount.isInteger()) {
+        const optimal = findOptimalLevel(ratePerMinute, null, 'extractor', configuredLevel);
+        if (optimal !== undefined) {
+          effectiveLevel = optimal;
+          extractorCount = calculateExtractorCount(ratePerMinute, effectiveLevel);
+        }
+      }
 
       addToSummary('extractor', extractorCount);
       addRawResource(itemId, ratePerMinute);
+      addPower('extractor', extractorCount, effectiveLevel);
 
       const node: ProductionNode = {
         itemId,
@@ -124,7 +167,8 @@ export function calculateProduction(
         building: {
           buildingType: 'extractor',
           count: extractorCount,
-          level: extractorLevel,
+          level: effectiveLevel,
+          configuredLevel,
         },
         children: [],
         isRaw: true,
@@ -155,10 +199,20 @@ export function calculateProduction(
     }
 
     // Calculate building requirements
-    const buildingLevel = buildingLevels.get(recipe.building) ?? 1;
-    const buildingCount = calculateBuildingCount(ratePerMinute, recipe, buildingLevel);
+    const configuredLevel = buildingLevels.get(recipe.building) ?? 1;
+    let effectiveLevel = configuredLevel;
+    let buildingCount = calculateBuildingCount(ratePerMinute, recipe, configuredLevel);
+
+    if (!buildingCount.isInteger()) {
+      const optimal = findOptimalLevel(ratePerMinute, recipe, recipe.building, configuredLevel);
+      if (optimal !== undefined) {
+        effectiveLevel = optimal;
+        buildingCount = calculateBuildingCount(ratePerMinute, recipe, effectiveLevel);
+      }
+    }
 
     addToSummary(recipe.building, buildingCount);
+    addPower(recipe.building, buildingCount, effectiveLevel);
 
     // Calculate ingredient requirements and build child nodes
     const children: ProductionNode[] = [];
@@ -180,7 +234,8 @@ export function calculateProduction(
       building: {
         buildingType: recipe.building,
         count: buildingCount,
-        level: buildingLevel,
+        level: effectiveLevel,
+        configuredLevel,
       },
       children,
       isRaw: false,
@@ -196,24 +251,12 @@ export function calculateProduction(
 
   const root = buildNode(targetItemId, Rational.fromNumber(targetRatePerMinute));
 
-  // Compute total power consumption
-  let totalPower = 0;
-  for (const [bt, count] of buildingSummary) {
-    const info = BUILDINGS[bt];
-    if (info) {
-      const level = buildingLevels.get(bt) ?? 1;
-      const idx = Math.min(level, info.maxLevel) - 1;
-      const powerPerBuilding = info.powerConsumption[idx];
-      totalPower += Math.ceil(count.toNumber()) * powerPerBuilding;
-    }
-  }
-
   return {
     root,
     allNodes,
     buildingSummary,
     rawResources,
-    totalPower,
+    totalPower: totalPowerAccum,
   };
 }
 
@@ -291,12 +334,12 @@ export function aggregateBuildingsByType(result: ProductionResult): Array<{
   }> = [];
 
   for (const [buildingType, count] of result.buildingSummary) {
-    // Level would need to come from somewhere - for now use first found
+    // Use configuredLevel (the global setting) for aggregate display
     let level = 1;
     for (const nodes of result.allNodes.values()) {
       for (const node of nodes) {
         if (node.building?.buildingType === buildingType) {
-          level = node.building.level;
+          level = node.building.configuredLevel;
           break;
         }
       }

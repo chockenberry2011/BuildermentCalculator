@@ -1,4 +1,4 @@
-import { ProductionResult, ProductionNode, BuildingRequirement } from './ProductionCalculator';
+import { ProductionResult, ProductionNode, BuildingRequirement, findOptimalLevel, calculateBuildingCount, calculateExtractorCount } from './ProductionCalculator';
 import { Recipe } from '../data/recipes';
 import { Rational } from './math/rational';
 import { gcdMultiple, isSplitterFriendlyRatio, isSimpleSplitterRatio } from './math/gcd';
@@ -54,6 +54,8 @@ export function flattenToDAG(result: ProductionResult, mode: BlueprintMergeMode 
     let recipe: Recipe | null = null;
     let itemName = itemId;
 
+    let configuredLevel = 1;
+
     for (const node of nodes) {
       totalRate = totalRate.add(node.ratePerMinute);
       itemName = node.itemName;
@@ -62,10 +64,12 @@ export function flattenToDAG(result: ProductionResult, mode: BlueprintMergeMode 
 
       // Take building info from first node (type/level consistent per item)
       if (!building && node.building) {
+        configuredLevel = node.building.configuredLevel;
         building = {
           buildingType: node.building.buildingType,
           count: node.building.count,
-          level: node.building.level,
+          level: node.building.configuredLevel,
+          configuredLevel: node.building.configuredLevel,
         };
       } else if (building && node.building) {
         // Sum building counts
@@ -73,8 +77,40 @@ export function flattenToDAG(result: ProductionResult, mode: BlueprintMergeMode 
           buildingType: building.buildingType,
           count: building.count.add(node.building.count),
           level: building.level,
+          configuredLevel: building.configuredLevel,
         };
       }
+    }
+
+    // Recompute building count from merged totalRate at configuredLevel, then auto-apply optimal
+    if (building) {
+      const recomputedCount = building.buildingType === 'extractor'
+        ? calculateExtractorCount(totalRate, configuredLevel)
+        : recipe
+          ? calculateBuildingCount(totalRate, recipe, configuredLevel)
+          : building.count;
+
+      let effectiveLevel = configuredLevel;
+      let effectiveCount = recomputedCount;
+
+      if (!recomputedCount.isInteger()) {
+        const optimal = findOptimalLevel(totalRate, recipe, building.buildingType, configuredLevel);
+        if (optimal !== undefined) {
+          effectiveLevel = optimal;
+          effectiveCount = building.buildingType === 'extractor'
+            ? calculateExtractorCount(totalRate, effectiveLevel)
+            : recipe
+              ? calculateBuildingCount(totalRate, recipe, effectiveLevel)
+              : recomputedCount;
+        }
+      }
+
+      building = {
+        buildingType: building.buildingType,
+        count: effectiveCount,
+        level: effectiveLevel,
+        configuredLevel,
+      };
     }
 
     nodeMap.set(itemId, { nodeKey: itemId, itemId, itemName, totalRate, building, isRaw, recipe });
@@ -201,11 +237,39 @@ function splitNonFriendlyNodes(
       // fraction = edgeRate / totalOutgoingRate
       const fraction = outEdge.rate.divide(totalOutRate);
       const dedicatedRate = node.totalRate.multiply(fraction);
-      const dedicatedBuilding = node.building ? {
-        buildingType: node.building.buildingType,
-        count: node.building.count.multiply(fraction),
-        level: node.building.level,
-      } : null;
+
+      let dedicatedBuilding: BuildingRequirement | null = null;
+      if (node.building) {
+        const cfgLevel = node.building.configuredLevel;
+        // Recompute count from dedicatedRate at configuredLevel
+        const recomputedCount = node.building.buildingType === 'extractor'
+          ? calculateExtractorCount(dedicatedRate, cfgLevel)
+          : node.recipe
+            ? calculateBuildingCount(dedicatedRate, node.recipe, cfgLevel)
+            : node.building.count.multiply(fraction);
+
+        let effectiveLevel = cfgLevel;
+        let effectiveCount = recomputedCount;
+
+        if (!recomputedCount.isInteger()) {
+          const optimal = findOptimalLevel(dedicatedRate, node.recipe, node.building.buildingType, cfgLevel);
+          if (optimal !== undefined) {
+            effectiveLevel = optimal;
+            effectiveCount = node.building.buildingType === 'extractor'
+              ? calculateExtractorCount(dedicatedRate, effectiveLevel)
+              : node.recipe
+                ? calculateBuildingCount(dedicatedRate, node.recipe, effectiveLevel)
+                : recomputedCount;
+          }
+        }
+
+        dedicatedBuilding = {
+          buildingType: node.building.buildingType,
+          count: effectiveCount,
+          level: effectiveLevel,
+          configuredLevel: cfgLevel,
+        };
+      }
 
       newNodes.push({
         nodeKey: dedicatedKey,

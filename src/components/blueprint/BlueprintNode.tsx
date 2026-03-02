@@ -9,6 +9,7 @@ import { getItemColor } from '../../data/itemColors';
 import { fractionSimplicityScore } from '../../core/RatioOptimizer';
 import { getCountColor } from '../../core/countColor';
 import { SplitBadge } from '../SplitBadge';
+import { LevelBadge } from '../LevelBadge';
 import { BadgePopover } from '../BadgePopover';
 import { useZoomLevel, type ZoomLevel } from '../../hooks/useZoomLevel';
 
@@ -164,6 +165,12 @@ function MiniNodePopoverContent({
           </div>
         </>
       )}
+      {building && building.level < building.configuredLevel && (
+        <div className="flex justify-between">
+          <span className={labelClass}>Optimized</span>
+          <span className="font-medium text-indigo-400">{'\u2192'} Lv{building.level} (from Lv{building.configuredLevel})</span>
+        </div>
+      )}
       {flatNode.isRaw && (
         <>
           <div className={`border-t my-1.5 ${dividerClass}`} />
@@ -261,7 +268,15 @@ function CompactNode({
       style={{
         width: 140,
         height: 40,
-        border: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
+        ...(building && building.level < building.configuredLevel
+          ? {
+              borderLeft: '3px solid #6366F1',
+              borderTop: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
+              borderRight: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
+              borderBottom: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
+            }
+          : { border: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}` }
+        ),
       }}
     >
       <div className="h-0.5" style={{ backgroundColor: accentColor }} />
@@ -353,7 +368,15 @@ function FullNode({
   return (
     <div
       className={`rounded-lg shadow-lg ${bgColor} ${borderClass} min-w-[170px] max-w-[200px] overflow-hidden`}
-      style={{ border: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}` }}
+      style={building && building.level < building.configuredLevel
+        ? {
+            borderLeft: '3px solid #6366F1',
+            borderTop: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
+            borderRight: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
+            borderBottom: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
+          }
+        : { border: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}` }
+      }
     >
       {/* Accent bar */}
       <div className="h-1" style={{ backgroundColor: accentColor }} />
@@ -412,6 +435,9 @@ function FullNode({
         )}
         {count && !count.isInteger && (
           <SplitBadge count={building!.count} variant="line" isDark={isDark} />
+        )}
+        {building && building.level < building.configuredLevel && (
+          <LevelBadge building={building} isDark={isDark} />
         )}
 
         {/* Input ingredients */}
