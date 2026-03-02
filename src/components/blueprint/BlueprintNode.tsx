@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { FlatNode } from '../../core/GraphFlattener';
-import type { BlueprintOrientation } from '../../store/useStore';
+import type { BlueprintOrientation, BlueprintProgressState } from '../../store/useStore';
 import { BUILDINGS } from '../../data/buildings';
 import { Rational } from '../../core/math/rational';
 import { BuildingIcon } from '../BuildingIcon';
@@ -29,8 +29,8 @@ export interface BlueprintNodeData {
   isDimmed?: boolean;
   isSelected?: boolean;
   orientation?: BlueprintOrientation;
-  isCompleted?: boolean;
-  onToggleCompleted?: () => void;
+  progressState?: BlueprintProgressState | false;
+  onToggleProgress?: () => void;
   [key: string]: unknown;
 }
 
@@ -62,6 +62,50 @@ function getHandlePositions(orientation: BlueprintOrientation): {
     return { inputPos: Position.Top, outputPos: Position.Bottom, spreadProp: 'left' };
   }
   return { inputPos: Position.Left, outputPos: Position.Right, spreadProp: 'top' };
+}
+
+function getProgressColors(progressState: BlueprintProgressState | false, isDark: boolean): { bgClass: string; borderColor: string } {
+  if (progressState === 'completed') {
+    return {
+      bgClass: isDark ? 'bg-green-900/60' : 'bg-green-100',
+      borderColor: isDark ? '#166534' : '#86EFAC',
+    };
+  }
+  if (progressState === 'in_progress') {
+    return {
+      bgClass: isDark ? 'bg-amber-900/40' : 'bg-amber-50',
+      borderColor: isDark ? '#92400E' : '#FCD34D',
+    };
+  }
+  return {
+    bgClass: isDark ? 'bg-gray-800' : 'bg-white',
+    borderColor: isDark ? '#374151' : '#D1D5DB',
+  };
+}
+
+function ProgressCheckbox({ progressState, isDark, size }: { progressState: BlueprintProgressState | false; isDark: boolean; size: number }) {
+  if (progressState === 'completed') {
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="3" />
+        <path d="m9 12 2 2 4-4" stroke="white" strokeWidth="2.5" />
+      </svg>
+    );
+  }
+  if (progressState === 'in_progress') {
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill={isDark ? '#92400E' : '#FEF3C7'} stroke={isDark ? '#F59E0B' : '#D97706'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="3" />
+        <line x1="8" y1="10" x2="16" y2="10" stroke={isDark ? '#FCD34D' : '#92400E'} strokeWidth="2" />
+        <line x1="8" y1="14" x2="16" y2="14" stroke={isDark ? '#FCD34D' : '#92400E'} strokeWidth="2" />
+      </svg>
+    );
+  }
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={isDark ? '#6B7280' : '#9CA3AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+    </svg>
+  );
 }
 
 function NodeHandles({
@@ -188,7 +232,7 @@ function MiniNode({
   outputItemIds,
   isDark,
   orientation,
-  isCompleted,
+  progressState,
 }: {
   flatNode: FlatNode;
   accentColor: string;
@@ -196,8 +240,9 @@ function MiniNode({
   outputItemIds: string[];
   isDark: boolean;
   orientation: BlueprintOrientation;
-  isCompleted: boolean;
+  progressState: BlueprintProgressState | false;
 }) {
+  const opacity = progressState === 'completed' ? 0.4 : progressState === 'in_progress' ? 0.65 : 0.9;
   return (
     <BadgePopover
       isDark={isDark}
@@ -210,7 +255,7 @@ function MiniNode({
           width: 60,
           height: 24,
           backgroundColor: accentColor,
-          opacity: isCompleted ? 0.4 : 0.9,
+          opacity,
         }}
       >
         <NodeHandles
@@ -236,8 +281,8 @@ function CompactNode({
   isRoot,
   isSelected,
   orientation,
-  isCompleted,
-  onToggleCompleted,
+  progressState,
+  onToggleProgress,
 }: {
   flatNode: FlatNode;
   accentColor: string;
@@ -247,14 +292,12 @@ function CompactNode({
   isRoot: boolean;
   isSelected: boolean;
   orientation: BlueprintOrientation;
-  isCompleted: boolean;
-  onToggleCompleted?: () => void;
+  progressState: BlueprintProgressState | false;
+  onToggleProgress?: () => void;
 }) {
   const building = flatNode.building;
   const count = building ? formatCount(building.count) : null;
-  const bgColor = isCompleted
-    ? (isDark ? 'bg-green-900/60' : 'bg-green-100')
-    : (isDark ? 'bg-gray-800' : 'bg-white');
+  const { bgClass, borderColor } = getProgressColors(progressState, isDark);
   const textColor = isDark ? 'text-gray-100' : 'text-gray-900';
   const borderClass = isSelected
     ? 'ring-2 ring-yellow-400 ring-offset-1 ring-offset-transparent'
@@ -264,18 +307,18 @@ function CompactNode({
 
   return (
     <div
-      className={`rounded-md shadow-md ${bgColor} ${borderClass} overflow-hidden`}
+      className={`rounded-md shadow-md ${bgClass} ${borderClass} overflow-hidden`}
       style={{
         width: 140,
         height: 40,
         ...(building && building.level < building.configuredLevel
           ? {
               borderLeft: '3px solid #6366F1',
-              borderTop: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
-              borderRight: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
-              borderBottom: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
+              borderTop: `1px solid ${borderColor}`,
+              borderRight: `1px solid ${borderColor}`,
+              borderBottom: `1px solid ${borderColor}`,
             }
-          : { border: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}` }
+          : { border: `1px solid ${borderColor}` }
         ),
       }}
     >
@@ -292,22 +335,13 @@ function CompactNode({
             {count.text}x
           </span>
         )}
-        {onToggleCompleted && (
+        {onToggleProgress && (
           <button
             className="shrink-0 pointer-events-auto"
-            onClick={(e) => { e.stopPropagation(); onToggleCompleted(); }}
-            title={isCompleted ? 'Mark as not built' : 'Mark as built'}
+            onClick={(e) => { e.stopPropagation(); onToggleProgress(); }}
+            title={progressState === 'completed' ? 'Reset progress' : progressState === 'in_progress' ? 'Mark as built' : 'Mark as in progress'}
           >
-            {isCompleted ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="3" />
-                <path d="m9 12 2 2 4-4" stroke="white" strokeWidth="2.5" />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={isDark ? '#6B7280' : '#9CA3AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="3" />
-              </svg>
-            )}
+            <ProgressCheckbox progressState={progressState} isDark={isDark} size={12} />
           </button>
         )}
       </div>
@@ -334,8 +368,8 @@ function FullNode({
   isRoot,
   isSelected,
   orientation,
-  isCompleted,
-  onToggleCompleted,
+  progressState,
+  onToggleProgress,
 }: {
   flatNode: FlatNode;
   accentColor: string;
@@ -346,17 +380,15 @@ function FullNode({
   isRoot: boolean;
   isSelected: boolean;
   orientation: BlueprintOrientation;
-  isCompleted: boolean;
-  onToggleCompleted?: () => void;
+  progressState: BlueprintProgressState | false;
+  onToggleProgress?: () => void;
 }) {
   const building = flatNode.building;
   const buildingType = building?.buildingType ?? 'workshop';
   const buildingName = building ? (BUILDINGS[building.buildingType]?.name ?? '') : '';
   const count = building ? formatCount(building.count) : null;
 
-  const bgColor = isCompleted
-    ? (isDark ? 'bg-green-900/60' : 'bg-green-100')
-    : (isDark ? 'bg-gray-800' : 'bg-white');
+  const { bgClass, borderColor } = getProgressColors(progressState, isDark);
   const textColor = isDark ? 'text-gray-100' : 'text-gray-900';
   const subtextColor = isDark ? 'text-gray-400' : 'text-gray-500';
   const borderClass = isSelected
@@ -367,15 +399,15 @@ function FullNode({
 
   return (
     <div
-      className={`rounded-lg shadow-lg ${bgColor} ${borderClass} min-w-[170px] max-w-[200px] overflow-hidden`}
+      className={`rounded-lg shadow-lg ${bgClass} ${borderClass} min-w-[170px] max-w-[200px] overflow-hidden`}
       style={building && building.level < building.configuredLevel
         ? {
             borderLeft: '3px solid #6366F1',
-            borderTop: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
-            borderRight: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
-            borderBottom: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}`,
+            borderTop: `1px solid ${borderColor}`,
+            borderRight: `1px solid ${borderColor}`,
+            borderBottom: `1px solid ${borderColor}`,
           }
-        : { border: `1px solid ${isCompleted ? (isDark ? '#166534' : '#86EFAC') : (isDark ? '#374151' : '#D1D5DB')}` }
+        : { border: `1px solid ${borderColor}` }
       }
     >
       {/* Accent bar */}
@@ -383,22 +415,13 @@ function FullNode({
 
       <div className="px-3 py-2 relative">
         {/* Progress checkbox */}
-        {onToggleCompleted && (
+        {onToggleProgress && (
           <button
             className="absolute top-1.5 right-1.5 pointer-events-auto"
-            onClick={(e) => { e.stopPropagation(); onToggleCompleted(); }}
-            title={isCompleted ? 'Mark as not built' : 'Mark as built'}
+            onClick={(e) => { e.stopPropagation(); onToggleProgress(); }}
+            title={progressState === 'completed' ? 'Reset progress' : progressState === 'in_progress' ? 'Mark as built' : 'Mark as in progress'}
           >
-            {isCompleted ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#22C55E" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="3" />
-                <path d="m9 12 2 2 4-4" stroke="white" strokeWidth="2.5" />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isDark ? '#6B7280' : '#9CA3AF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="3" />
-              </svg>
-            )}
+            <ProgressCheckbox progressState={progressState} isDark={isDark} size={14} />
           </button>
         )}
 
@@ -476,11 +499,11 @@ function FullNode({
 }
 
 export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
-  const { flatNode, inputItemIds, outputItemIds, inputIngredients, isDark, isRoot, isDimmed, isSelected, orientation, isCompleted, onToggleCompleted } = data as BlueprintNodeData;
+  const { flatNode, inputItemIds, outputItemIds, inputIngredients, isDark, isRoot, isDimmed, isSelected, orientation, progressState, onToggleProgress } = data as BlueprintNodeData;
   const accentColor = getItemColor(flatNode.itemId);
   const zoomLevel: ZoomLevel = useZoomLevel();
   const orient = orientation ?? 'horizontal';
-  const completed = isCompleted ?? false;
+  const progress = progressState || false;
 
   const dimStyle = isDimmed ? { opacity: 0.25, transition: 'opacity 0.2s' } : { transition: 'opacity 0.2s' };
 
@@ -494,7 +517,7 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
           outputItemIds={outputItemIds}
           isDark={isDark}
           orientation={orient}
-          isCompleted={completed}
+          progressState={progress}
         />
       </div>
     );
@@ -512,8 +535,8 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
           isRoot={isRoot}
           isSelected={isSelected ?? false}
           orientation={orient}
-          isCompleted={completed}
-          onToggleCompleted={onToggleCompleted}
+          progressState={progress}
+          onToggleProgress={onToggleProgress}
         />
       </div>
     );
@@ -531,8 +554,8 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
         isRoot={isRoot}
         isSelected={isSelected ?? false}
         orientation={orient}
-        isCompleted={completed}
-        onToggleCompleted={onToggleCompleted}
+        progressState={progress}
+        onToggleProgress={onToggleProgress}
       />
     </div>
   );

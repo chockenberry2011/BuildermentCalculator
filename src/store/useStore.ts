@@ -25,6 +25,7 @@ export type ThemeMode = 'light' | 'dark';
 export type OptimizationDetailLevel = 'minimal' | 'standard' | 'full';
 export type BlueprintOrientation = 'horizontal' | 'vertical';
 export type BlueprintMergeMode = 'merged' | 'hybrid' | 'dedicated';
+export type BlueprintProgressState = 'in_progress' | 'completed';
 
 // Feature 2: Fractional building fix suggestions
 export interface ScalingSuggestion {
@@ -101,8 +102,8 @@ interface CalculatorState {
   blueprintMergeMode: BlueprintMergeMode;
   collapsedSections: Record<string, boolean>;
 
-  // Blueprint progress tracking (nodeKey → completed)
-  blueprintProgress: Map<string, boolean>;
+  // Blueprint progress tracking (nodeKey → state; absence = not started)
+  blueprintProgress: Map<string, BlueprintProgressState>;
 
   // Blueprint node position overrides (nodeKey → {x, y})
   blueprintPositions: Map<string, { x: number; y: number }>;
@@ -152,6 +153,7 @@ interface CalculatorState {
   setRateFromResourceAmount: (resourceId: string, ratePerMinute: number) => void;
   setRateFromExtractorCount: (resourceId: string, extractorCount: number) => void;
   toggleBlueprintProgress: (nodeKey: string) => void;
+  setBlueprintProgressState: (nodeKey: string, state: BlueprintProgressState | null) => void;
   clearBlueprintProgress: () => void;
   setBlueprintPosition: (nodeKey: string, position: { x: number; y: number }) => void;
   clearBlueprintPositions: () => void;
@@ -444,10 +446,23 @@ export const useStore = create<CalculatorState>()(
 
       toggleBlueprintProgress: (nodeKey) => {
         const progress = new Map(get().blueprintProgress);
-        if (progress.get(nodeKey)) {
+        const current = progress.get(nodeKey);
+        if (!current) {
+          progress.set(nodeKey, 'in_progress');
+        } else if (current === 'in_progress') {
+          progress.set(nodeKey, 'completed');
+        } else {
+          progress.delete(nodeKey);
+        }
+        set({ blueprintProgress: progress });
+      },
+
+      setBlueprintProgressState: (nodeKey, state) => {
+        const progress = new Map(get().blueprintProgress);
+        if (state === null) {
           progress.delete(nodeKey);
         } else {
-          progress.set(nodeKey, true);
+          progress.set(nodeKey, state);
         }
         set({ blueprintProgress: progress });
       },
@@ -645,7 +660,13 @@ export const useStore = create<CalculatorState>()(
           state.recipeSelections = objectToMap(state.recipeSelections as unknown as Record<string, string>);
           state.buildingLevels = objectToMap(state.buildingLevels as unknown as Record<BuildingType, number>);
 
-          state.blueprintProgress = objectToMap(state.blueprintProgress as unknown as Record<string, boolean>);
+          state.blueprintProgress = objectToMap(state.blueprintProgress as unknown as Record<string, BlueprintProgressState>);
+          // Migrate old boolean `true` values to 'completed'
+          for (const [key, value] of state.blueprintProgress) {
+            if (value === true as unknown) {
+              state.blueprintProgress.set(key, 'completed');
+            }
+          }
           state.blueprintPositions = objectToMap(state.blueprintPositions as unknown as Record<string, { x: number; y: number }>);
 
           // Migrate persisted 'graph' viewMode to 'blueprint'

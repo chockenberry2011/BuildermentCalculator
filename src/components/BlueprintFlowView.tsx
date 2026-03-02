@@ -15,7 +15,7 @@ import {
   type Viewport,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { useStore, type BlueprintOrientation, type BlueprintMergeMode } from '../store/useStore';
+import { useStore, type BlueprintOrientation, type BlueprintMergeMode, type BlueprintProgressState } from '../store/useStore';
 import { flattenToDAG, layoutDAG, type FlatDAG } from '../core/GraphFlattener';
 import { BlueprintNode, type BlueprintNodeData, type NodeInputInfo } from './blueprint/BlueprintNode';
 import { BlueprintEdge, type BlueprintEdgeData } from './blueprint/BlueprintEdge';
@@ -47,7 +47,7 @@ function buildReactFlowData(
   rootItemId: string,
   orientation: BlueprintOrientation,
   rootItemIds?: Set<string>,
-  blueprintProgress?: Map<string, boolean>,
+  blueprintProgress?: Map<string, BlueprintProgressState>,
   toggleBlueprintProgress?: (itemId: string) => void,
 ): { rfNodes: Node[]; rfEdges: Edge[]; adjacency: AdjacencyMaps } {
   const inputsOf = new Map<string, string[]>();
@@ -119,8 +119,8 @@ function buildReactFlowData(
         isDark,
         isRoot: rootItemIds ? rootItemIds.has(flatNode.itemId) : flatNode.itemId === rootItemId,
         orientation,
-        isCompleted: blueprintProgress?.get(flatNode.nodeKey) ?? false,
-        onToggleCompleted: toggleBlueprintProgress ? () => toggleBlueprintProgress(flatNode.nodeKey) : undefined,
+        progressState: blueprintProgress?.get(flatNode.nodeKey) ?? false,
+        onToggleProgress: toggleBlueprintProgress ? () => toggleBlueprintProgress(flatNode.nodeKey) : undefined,
       } satisfies BlueprintNodeData,
     };
   });
@@ -347,7 +347,7 @@ function BlueprintToolbar({
             <button
               onClick={onClearProgress}
               className={`${text} ${textHover} rounded-md px-2 py-1.5 text-xs transition-colors`}
-              title="Reset progress"
+              title="Reset all progress"
             >
               Reset &#x2713;
             </button>

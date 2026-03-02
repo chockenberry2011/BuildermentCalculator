@@ -1,7 +1,7 @@
 import { ProductionNode } from '../core/ProductionCalculator';
 import { BUILDINGS } from '../data/buildings';
 import { getItemColor } from '../data/itemColors';
-import { useStore } from '../store/useStore';
+import { useStore, type BlueprintProgressState } from '../store/useStore';
 import { BeltCalculationResult } from '../core/BeltCalculator';
 import { BuildingIcon } from './BuildingIcon';
 import { BeltBadge } from './BeltBadge';
@@ -16,11 +16,11 @@ interface TreeNodeProps {
   beltResult: BeltCalculationResult | null;
   setRateFromItemBuildingCount: (itemId: string, count: number) => void;
   constraintSource: { type: string; itemId?: string };
-  blueprintProgress: Map<string, boolean>;
-  toggleBlueprintProgress: (nodeKey: string) => void;
+  blueprintProgress: Map<string, BlueprintProgressState>;
+  setBlueprintProgressState: (nodeKey: string, state: BlueprintProgressState | null) => void;
 }
 
-function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCount, constraintSource, blueprintProgress, toggleBlueprintProgress }: TreeNodeProps) {
+function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCount, constraintSource, blueprintProgress, setBlueprintProgressState }: TreeNodeProps) {
   const indent = depth * 16;
 
   const buildingInfo = node.building;
@@ -31,12 +31,20 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
   const rate = node.ratePerMinute.toNumber();
   const isConstraint = constraintSource.type === 'itemBuilding' && constraintSource.itemId === node.itemId;
 
-  // Check progress: blueprint may store under "itemId" (merged) or "itemId_for_X" (split nodes)
-  const isDone = (() => {
-    if (blueprintProgress.get(node.itemId) === true) return true;
+  // Derive 3-state progress from base key + any split keys
+  const nodeProgressState: BlueprintProgressState | false = (() => {
+    const baseState = blueprintProgress.get(node.itemId);
     const splitPrefix = `${node.itemId}_for_`;
     const splitKeys = [...blueprintProgress.keys()].filter(k => k.startsWith(splitPrefix));
-    return splitKeys.length > 0 && splitKeys.every(k => blueprintProgress.get(k) === true);
+    const allKeys = baseState ? [node.itemId, ...splitKeys] : splitKeys;
+
+    if (allKeys.length === 0) return false;
+
+    const allCompleted = allKeys.every(k => blueprintProgress.get(k) === 'completed');
+    if (allCompleted) return 'completed';
+
+    // Any key set at all means in progress
+    return 'in_progress';
   })();
 
   // Find belt connection for this node (from this item to its parent)
@@ -48,28 +56,33 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
     <div className="font-mono text-xs sm:text-sm">
       <div
         className={`flex items-center py-1 rounded px-2 cursor-pointer ${
-          isDone
+          nodeProgressState === 'completed'
             ? isDark
               ? 'bg-green-900/60 hover:bg-green-900/80'
               : 'bg-green-100 hover:bg-green-200'
-            : isDark
-              ? 'hover:bg-gray-700/50'
-              : 'hover:bg-gray-100'
+            : nodeProgressState === 'in_progress'
+              ? isDark
+                ? 'bg-amber-900/40 hover:bg-amber-900/60'
+                : 'bg-amber-50 hover:bg-amber-100'
+              : isDark
+                ? 'hover:bg-gray-700/50'
+                : 'hover:bg-gray-100'
         }`}
-        style={{ paddingLeft: `${indent + 8}px`, opacity: isDone ? 0.6 : 1 }}
+        style={{ paddingLeft: `${indent + 8}px`, opacity: nodeProgressState === 'completed' ? 0.6 : 1 }}
         onClick={() => {
-          // Toggle base key + any split keys (itemId_for_X) to the same target state
+          // Cycle: false → in_progress → completed → false
+          const nextState: BlueprintProgressState | null =
+            !nodeProgressState ? 'in_progress' :
+            nodeProgressState === 'in_progress' ? 'completed' :
+            null;
+
+          // Set base key + all split keys to the same target state
           const splitPrefix = `${node.itemId}_for_`;
           const splitKeys = [...blueprintProgress.keys()].filter(k => k.startsWith(splitPrefix));
-          const willBeDone = !isDone;
-          // Set all split keys to match the new state
           for (const k of splitKeys) {
-            const isSet = blueprintProgress.get(k) === true;
-            if (isSet !== willBeDone) toggleBlueprintProgress(k);
+            setBlueprintProgressState(k, nextState);
           }
-          // Toggle the base key
-          const baseIsSet = blueprintProgress.get(node.itemId) === true;
-          if (baseIsSet !== willBeDone) toggleBlueprintProgress(node.itemId);
+          setBlueprintProgressState(node.itemId, nextState);
         }}
       >
         {/* Left side: connector + name + rate + dashed fill — fixed width so inputs align */}
@@ -143,7 +156,7 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
           setRateFromItemBuildingCount={setRateFromItemBuildingCount}
           constraintSource={constraintSource}
           blueprintProgress={blueprintProgress}
-          toggleBlueprintProgress={toggleBlueprintProgress}
+          setBlueprintProgressState={setBlueprintProgressState}
         />
       ))}
     </div>
@@ -158,7 +171,7 @@ export function ProductionTree() {
   const setRateFromItemBuildingCount = useStore((s) => s.setRateFromItemBuildingCount);
   const constraintSource = useStore((s) => s.constraintSource);
   const blueprintProgress = useStore((s) => s.blueprintProgress);
-  const toggleBlueprintProgress = useStore((s) => s.toggleBlueprintProgress);
+  const setBlueprintProgressState = useStore((s) => s.setBlueprintProgressState);
   const isDark = theme === 'dark';
 
   if (!productionResult) {
@@ -193,7 +206,7 @@ export function ProductionTree() {
               setRateFromItemBuildingCount={setRateFromItemBuildingCount}
               constraintSource={constraintSource}
               blueprintProgress={blueprintProgress}
-              toggleBlueprintProgress={toggleBlueprintProgress}
+              setBlueprintProgressState={setBlueprintProgressState}
             />
           </div>
         ))
@@ -216,7 +229,7 @@ export function ProductionTree() {
             setRateFromItemBuildingCount={setRateFromItemBuildingCount}
             constraintSource={constraintSource}
             blueprintProgress={blueprintProgress}
-            toggleBlueprintProgress={toggleBlueprintProgress}
+            setBlueprintProgressState={setBlueprintProgressState}
           />
         </>
       )}
