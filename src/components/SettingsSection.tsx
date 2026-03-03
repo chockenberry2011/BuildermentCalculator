@@ -34,6 +34,9 @@ export function SettingsSection() {
         </div>
         <span className={`text-xs sm:text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
           World Gen 2.0
+          <span className="ml-1.5 align-middle text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400 border border-amber-500/30 dark:border-amber-400/30">
+            BETA
+          </span>
         </span>
       </button>
       <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`} />
