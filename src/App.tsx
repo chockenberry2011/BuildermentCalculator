@@ -4,6 +4,7 @@ import { ResourceInput } from './components/ResourceInput';
 import { RecipePickerList } from './components/RecipePicker';
 import { SettingsSection } from './components/SettingsSection';
 import { RecipeBook } from './components/RecipeBook';
+import { FormulasSection } from './components/FormulasSection';
 import { ProductionTree } from './components/ProductionTree';
 import { BlueprintFlowView } from './components/BlueprintFlowView';
 import { SummaryTable } from './components/SummaryTable';
@@ -107,7 +108,7 @@ function AppContent() {
     if (!el) return;
     const observer = new IntersectionObserver(
       ([entry]) => setShowStickyBar(!entry.isIntersecting),
-      { threshold: 0 },
+      { threshold: 0, rootMargin: '-60px 0px 0px 0px' },
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -255,6 +256,10 @@ function AppContent() {
 
                 <CollapsibleSection title="Recipe Book" subtitle="Verify recipe data" isOpen={!collapsedSections['Recipe Book']} onToggle={() => toggleSection('Recipe Book')}>
                   <RecipeBook />
+                </CollapsibleSection>
+
+                <CollapsibleSection title="Formulas" subtitle="Math behind the calculations" isOpen={!collapsedSections['Formulas']} onToggle={() => toggleSection('Formulas')}>
+                  <FormulasSection />
                 </CollapsibleSection>
               </div>
             </div>

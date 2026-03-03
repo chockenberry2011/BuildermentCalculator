@@ -22,7 +22,7 @@ export function FullscreenToggle({ isFullscreen, onToggle }: FullscreenTogglePro
       {isFullscreen ? (
         /* Collapse: arrows pointing inward from corners */
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4l5 5m0-4v4H5m10-5l5 5m-4 0h4v-4M4 20l5-5m-4 0v4h4m7-4l5 5m0-4v4h-4" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5v4H5M9 9L4 4M15 5v4h4M15 9l5-5M5 15h4v4M9 15l-5 5M19 15h-4v4M15 15l5 5" />
         </svg>
       ) : (
         /* Expand: arrows pointing outward to corners */

@@ -441,7 +441,7 @@ function BlueprintFlowInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const { fitView } = useReactFlow();
+  const { fitView, getViewport, setViewport, getNodes } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Track viewport changes for persistence
@@ -464,10 +464,30 @@ function BlueprintFlowInner({
       shouldFitRef.current = false;
       // Allow React Flow to measure the new nodes before fitting
       requestAnimationFrame(() => {
-        fitView({ padding: 0.2, duration: 200 });
+        fitView({ padding: 0.2, duration: 0 }).then(() => {
+          // Shift viewport so the graph is top-aligned instead of vertically centered
+          const viewport = getViewport();
+          const rfNodes = getNodes();
+          if (rfNodes.length === 0) return;
+          const containerHeight = containerRef.current?.clientHeight ?? 0;
+          // Find the bounding box of all nodes
+          let minY = Infinity, maxY = -Infinity;
+          for (const n of rfNodes) {
+            const h = n.measured?.height ?? n.height ?? 100;
+            if (n.position.y < minY) minY = n.position.y;
+            if (n.position.y + h > maxY) maxY = n.position.y + h;
+          }
+          const contentHeight = (maxY - minY) * viewport.zoom;
+          const padding = containerHeight * 0.05; // 5% top padding
+          // Only adjust if content doesn't fill the viewport (otherwise fitView is fine as-is)
+          if (contentHeight < containerHeight) {
+            const topY = -minY * viewport.zoom + padding;
+            setViewport({ x: viewport.x, y: topY, zoom: viewport.zoom }, { duration: 200 });
+          }
+        });
       });
     }
-  }, [initialNodes, initialEdges, setNodes, setEdges, fitView]);
+  }, [initialNodes, initialEdges, setNodes, setEdges, fitView, getViewport, setViewport, getNodes]);
 
   // Apply highlighting when selection changes
   useEffect(() => {
