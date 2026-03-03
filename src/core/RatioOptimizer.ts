@@ -23,9 +23,10 @@ export interface ExtractorCost {
 export function computeExtractorCost(
   referenceResult: ProductionResult,
   scale: number,
-  extractorLevel: number
+  extractorLevel: number,
+  extractorRates: number[] = EXTRACTOR_RATES
 ): ExtractorCost {
-  const ratePerExtractor = EXTRACTOR_RATES[extractorLevel - 1];
+  const ratePerExtractor = extractorRates[extractorLevel - 1];
   const perResource = new Map<string, number>();
   let total = 0;
 
@@ -610,7 +611,8 @@ export function describeFractionQuality(rationalCounts: Map<BuildingType, Ration
 export function findBestPracticalRates(
   referenceResult: ProductionResult,
   extractorLevel: number,
-  beltSpeed: number
+  beltSpeed: number,
+  extractorRates: number[] = EXTRACTOR_RATES
 ): BestPracticalRates {
   const minIntegerScale = findMinIntegerScale(referenceResult);
 
@@ -694,7 +696,7 @@ export function findBestPracticalRates(
     if (scale <= 0) continue;
 
     const candidate = evaluateScale(referenceResult, scale, beltSpeed);
-    const extractorCost = computeExtractorCost(referenceResult, scale, extractorLevel);
+    const extractorCost = computeExtractorCost(referenceResult, scale, extractorLevel, extractorRates);
     const rationalCounts = computeRationalBuildingCounts(referenceResult, scale);
     const fractionScore = computeCombinedFractionScore(rationalCounts);
     const allInteger = candidate.integerCount === candidate.totalBuildings;
@@ -745,7 +747,7 @@ export function findBestPracticalRates(
     for (const mult of [2, 4, 8]) {
       const doubledScale = eval_.scale * mult;
       const dCandidate = evaluateScale(referenceResult, doubledScale, beltSpeed);
-      const dExtractorCost = computeExtractorCost(referenceResult, doubledScale, extractorLevel);
+      const dExtractorCost = computeExtractorCost(referenceResult, doubledScale, extractorLevel, extractorRates);
       const dRationalCounts = computeRationalBuildingCounts(referenceResult, doubledScale);
       const dFractionScore = computeCombinedFractionScore(dRationalCounts);
       // Only include doublings that maintain fraction quality

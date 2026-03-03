@@ -1,5 +1,6 @@
 import { ProductionResult, ProductionNode, BuildingRequirement, findOptimalLevel, calculateBuildingCount, calculateExtractorCount } from './ProductionCalculator';
 import { Recipe } from '../data/recipes';
+import { EXTRACTOR_RATES } from '../data/buildings';
 import { Rational } from './math/rational';
 import { gcdMultiple, isSplitterFriendlyRatio, isSimpleSplitterRatio } from './math/gcd';
 
@@ -42,7 +43,7 @@ export type BlueprintMergeMode = 'merged' | 'hybrid' | 'dedicated';
  * When mode is 'hybrid', only nodes whose ratio sum exceeds 6 are split
  * (more permissive than dedicated — keeps simple ratios like 1:2, 2:3 merged).
  */
-export function flattenToDAG(result: ProductionResult, mode: BlueprintMergeMode = 'merged'): FlatDAG {
+export function flattenToDAG(result: ProductionResult, mode: BlueprintMergeMode = 'merged', extractorRates: number[] = EXTRACTOR_RATES): FlatDAG {
   // Step 1: Build deduplicated nodes from allNodes map
   const nodeMap = new Map<string, FlatNode>();
 
@@ -85,7 +86,7 @@ export function flattenToDAG(result: ProductionResult, mode: BlueprintMergeMode 
     // Recompute building count from merged totalRate at configuredLevel, then auto-apply optimal
     if (building) {
       const recomputedCount = building.buildingType === 'extractor'
-        ? calculateExtractorCount(totalRate, configuredLevel)
+        ? calculateExtractorCount(totalRate, configuredLevel, extractorRates)
         : recipe
           ? calculateBuildingCount(totalRate, recipe, configuredLevel)
           : building.count;
@@ -94,11 +95,11 @@ export function flattenToDAG(result: ProductionResult, mode: BlueprintMergeMode 
       let effectiveCount = recomputedCount;
 
       if (!recomputedCount.isInteger()) {
-        const optimal = findOptimalLevel(totalRate, recipe, building.buildingType, configuredLevel);
+        const optimal = findOptimalLevel(totalRate, recipe, building.buildingType, configuredLevel, extractorRates);
         if (optimal !== undefined) {
           effectiveLevel = optimal;
           effectiveCount = building.buildingType === 'extractor'
-            ? calculateExtractorCount(totalRate, effectiveLevel)
+            ? calculateExtractorCount(totalRate, effectiveLevel, extractorRates)
             : recipe
               ? calculateBuildingCount(totalRate, recipe, effectiveLevel)
               : recomputedCount;
@@ -155,7 +156,7 @@ export function flattenToDAG(result: ProductionResult, mode: BlueprintMergeMode 
   // Step 3: Splitting post-pass for hybrid and dedicated modes
   if (mode === 'dedicated' || mode === 'hybrid') {
     const predicate = mode === 'hybrid' ? isSimpleSplitterRatio : isSplitterFriendlyRatio;
-    const result = splitNonFriendlyNodes(nodes, edges, nodeMap, predicate);
+    const result = splitNonFriendlyNodes(nodes, edges, nodeMap, predicate, extractorRates);
     nodes = result.nodes;
     edges = result.edges;
   }
@@ -171,6 +172,7 @@ function splitNonFriendlyNodes(
   edges: FlatEdge[],
   nodeMap: Map<string, FlatNode>,
   isFriendly: (parts: number[]) => boolean,
+  extractorRates: number[],
 ): { nodes: FlatNode[]; edges: FlatEdge[] } {
   // Build outgoing edge map by fromNodeKey
   const outgoingOf = new Map<string, FlatEdge[]>();
@@ -243,7 +245,7 @@ function splitNonFriendlyNodes(
         const cfgLevel = node.building.configuredLevel;
         // Recompute count from dedicatedRate at configuredLevel
         const recomputedCount = node.building.buildingType === 'extractor'
-          ? calculateExtractorCount(dedicatedRate, cfgLevel)
+          ? calculateExtractorCount(dedicatedRate, cfgLevel, extractorRates)
           : node.recipe
             ? calculateBuildingCount(dedicatedRate, node.recipe, cfgLevel)
             : node.building.count.multiply(fraction);
@@ -252,11 +254,11 @@ function splitNonFriendlyNodes(
         let effectiveCount = recomputedCount;
 
         if (!recomputedCount.isInteger()) {
-          const optimal = findOptimalLevel(dedicatedRate, node.recipe, node.building.buildingType, cfgLevel);
+          const optimal = findOptimalLevel(dedicatedRate, node.recipe, node.building.buildingType, cfgLevel, extractorRates);
           if (optimal !== undefined) {
             effectiveLevel = optimal;
             effectiveCount = node.building.buildingType === 'extractor'
-              ? calculateExtractorCount(dedicatedRate, effectiveLevel)
+              ? calculateExtractorCount(dedicatedRate, effectiveLevel, extractorRates)
               : node.recipe
                 ? calculateBuildingCount(dedicatedRate, node.recipe, effectiveLevel)
                 : recomputedCount;

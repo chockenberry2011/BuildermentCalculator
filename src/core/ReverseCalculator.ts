@@ -41,11 +41,12 @@ export function calculateFromResources(
   constraints: ResourceConstraint[],
   recipeSelections: RecipeSelections,
   buildingLevels: BuildingLevels,
-  beltSpeed: number
+  beltSpeed: number,
+  extractorRates: number[] = EXTRACTOR_RATES
 ): ReverseResult {
   // Build a map of available rates from constraints
   const extractorLevel = buildingLevels.get('extractor') ?? 1;
-  const ratePerExtractor = EXTRACTOR_RATES[extractorLevel - 1];
+  const ratePerExtractor = extractorRates[extractorLevel - 1];
 
   const availableRates = new Map<string, number>();
   for (const constraint of constraints) {
@@ -58,7 +59,8 @@ export function calculateFromResources(
     targetItemId,
     1,
     recipeSelections,
-    buildingLevels
+    buildingLevels,
+    extractorRates
   );
 
   // Find the bottleneck resource
@@ -108,7 +110,8 @@ export function calculateFromResources(
     targetItemId,
     maxOutputRate,
     recipeSelections,
-    buildingLevels
+    buildingLevels,
+    extractorRates
   );
 
   // Build building requirements map

@@ -22,7 +22,7 @@ import { BlueprintEdge, type BlueprintEdgeData } from './blueprint/BlueprintEdge
 import { BlueprintSearch } from './blueprint/BlueprintSearch';
 import { useZoomLevel } from '../hooks/useZoomLevel';
 import { getItemColor } from '../data/itemColors';
-import { BUILDINGS } from '../data/buildings';
+import { BUILDINGS, getExtractorRates } from '../data/buildings';
 import { classifyBeltStatus, getBeltsNeeded, getBeltUtilization } from '../data/belts';
 import { buildSplitterTree, ratesToParts, type SplitterTreeInfo } from '../core/splitterTree';
 
@@ -703,6 +703,8 @@ export function BlueprintFlowView({ isFullscreen }: { isFullscreen?: boolean } =
   const orientation = useStore((s) => s.blueprintOrientation);
   const setBlueprintOrientation = useStore((s) => s.setBlueprintOrientation);
   const blueprintMergeMode = useStore((s) => s.blueprintMergeMode);
+  const worldGen2 = useStore((s) => s.worldGen2);
+  const extractorRates = getExtractorRates(worldGen2);
   const setBlueprintMergeMode = useStore((s) => s.setBlueprintMergeMode);
   const blueprintProgress = useStore((s) => s.blueprintProgress);
   const toggleBlueprintProgress = useStore((s) => s.toggleBlueprintProgress);
@@ -736,7 +738,7 @@ export function BlueprintFlowView({ isFullscreen }: { isFullscreen?: boolean } =
         } as AdjacencyMaps,
       };
     }
-    const dag = flattenToDAG(productionResult, blueprintMergeMode);
+    const dag = flattenToDAG(productionResult, blueprintMergeMode, extractorRates);
     dag.nodes = dag.nodes.filter((n) => n.nodeKey !== '__multi_root__');
     const computedPositions = layoutDAG(dag, orientation);
     // Overlay user-saved position overrides on top of algorithmically computed positions
@@ -758,7 +760,7 @@ export function BlueprintFlowView({ isFullscreen }: { isFullscreen?: boolean } =
       toggleBlueprintProgress,
     );
     return { initialNodes: rfNodes, initialEdges: rfEdges, adjacency };
-  }, [productionResult, beltSpeed, isDark, targetItemId, rootItemIds, orientation, blueprintMergeMode, blueprintProgress, toggleBlueprintProgress, blueprintPositions]);
+  }, [productionResult, beltSpeed, isDark, targetItemId, rootItemIds, orientation, blueprintMergeMode, blueprintProgress, toggleBlueprintProgress, blueprintPositions, extractorRates]);
 
   // Structural key for detecting graph topology changes
   const structureKey = useMemo(() => {

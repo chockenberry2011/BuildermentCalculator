@@ -79,9 +79,10 @@ export function calculateBuildingCount(
 
 export function calculateExtractorCount(
   ratePerMinute: Rational,
-  extractorLevel: number
+  extractorLevel: number,
+  extractorRates: number[] = EXTRACTOR_RATES
 ): Rational {
-  const outputPerExtractor = EXTRACTOR_RATES[extractorLevel - 1];
+  const outputPerExtractor = extractorRates[extractorLevel - 1];
   return ratePerMinute.divide(Rational.fromNumber(outputPerExtractor));
 }
 
@@ -93,7 +94,8 @@ export function findOptimalLevel(
   ratePerMinute: Rational,
   recipe: Recipe | null,
   buildingType: BuildingType,
-  configuredLevel: number
+  configuredLevel: number,
+  extractorRates: number[] = EXTRACTOR_RATES
 ): number | undefined {
   if (configuredLevel <= 1) return undefined;
   if (buildingType === 'earth_teleporter') return undefined;
@@ -101,7 +103,7 @@ export function findOptimalLevel(
   for (let level = configuredLevel - 1; level >= 1; level--) {
     const count = recipe
       ? calculateBuildingCount(ratePerMinute, recipe, level)
-      : calculateExtractorCount(ratePerMinute, level);
+      : calculateExtractorCount(ratePerMinute, level, extractorRates);
     if (count.isInteger()) return level;
   }
   return undefined;
@@ -111,7 +113,8 @@ export function calculateProduction(
   targetItemId: string,
   targetRatePerMinute: number,
   recipeSelections: RecipeSelections,
-  buildingLevels: BuildingLevels
+  buildingLevels: BuildingLevels,
+  extractorRates: number[] = EXTRACTOR_RATES
 ): ProductionResult {
   const allNodes = new Map<string, ProductionNode[]>();
   const buildingSummary = new Map<BuildingType, Rational>();
@@ -145,13 +148,13 @@ export function calculateProduction(
     if (isRawResource(itemId)) {
       const configuredLevel = buildingLevels.get('extractor') ?? 1;
       let effectiveLevel = configuredLevel;
-      let extractorCount = calculateExtractorCount(ratePerMinute, configuredLevel);
+      let extractorCount = calculateExtractorCount(ratePerMinute, configuredLevel, extractorRates);
 
       if (!extractorCount.isInteger()) {
-        const optimal = findOptimalLevel(ratePerMinute, null, 'extractor', configuredLevel);
+        const optimal = findOptimalLevel(ratePerMinute, null, 'extractor', configuredLevel, extractorRates);
         if (optimal !== undefined) {
           effectiveLevel = optimal;
-          extractorCount = calculateExtractorCount(ratePerMinute, effectiveLevel);
+          extractorCount = calculateExtractorCount(ratePerMinute, effectiveLevel, extractorRates);
         }
       }
 
@@ -267,10 +270,11 @@ export function calculateProduction(
 export function calculateMultiProduction(
   targets: { itemId: string; rate: number }[],
   recipeSelections: RecipeSelections,
-  buildingLevels: BuildingLevels
+  buildingLevels: BuildingLevels,
+  extractorRates: number[] = EXTRACTOR_RATES
 ): ProductionResult {
   const results = targets.map((t) =>
-    calculateProduction(t.itemId, t.rate, recipeSelections, buildingLevels)
+    calculateProduction(t.itemId, t.rate, recipeSelections, buildingLevels, extractorRates)
   );
 
   // Merge allNodes, buildingSummary, rawResources, totalPower

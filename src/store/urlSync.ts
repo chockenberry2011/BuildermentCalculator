@@ -10,6 +10,7 @@ export interface URLState {
   recipes?: Map<string, string>;
   levels?: Map<string, number>;
   targets?: { itemId: string; rate: number }[];
+  worldGen2?: boolean;
 }
 
 export function parseURLParams(): URLState {
@@ -96,6 +97,12 @@ export function parseURLParams(): URLState {
     if (map.size > 0) result.levels = map;
   }
 
+  // World Gen 2.0
+  const worldgen = params.get('worldgen');
+  if (worldgen === '1') {
+    result.worldGen2 = true;
+  }
+
   return result;
 }
 
@@ -108,6 +115,7 @@ interface StoreStateForURL {
   recipeSelections: Map<string, string>;
   buildingLevels: Map<string, number>;
   targets?: { id: string; itemId: string; rate: number }[];
+  worldGen2?: boolean;
 }
 
 export function updateURL(state: StoreStateForURL) {
@@ -150,6 +158,11 @@ export function updateURL(state: StoreStateForURL) {
     }
   }
   if (nonDefaultLevels.length > 0) params.set('levels', nonDefaultLevels.join(','));
+
+  // Only include worldgen when enabled (non-default)
+  if (state.worldGen2) {
+    params.set('worldgen', '1');
+  }
 
   const newURL = `${window.location.pathname}?${params.toString()}`;
   window.history.replaceState(null, '', newURL);

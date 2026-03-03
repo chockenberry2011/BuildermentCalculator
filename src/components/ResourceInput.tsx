@@ -1,6 +1,6 @@
 import { useStore } from '../store/useStore';
 import { ITEMS } from '../data/items';
-import { EXTRACTOR_RATES } from '../data/buildings';
+import { getExtractorRates } from '../data/buildings';
 import { StepperButton } from './StepperButton';
 import { ResourceIcon } from './ResourceIcon';
 
@@ -9,11 +9,12 @@ export function ResourceInput() {
   const setRateFromExtractorCount = useStore((s) => s.setRateFromExtractorCount);
   const constraintSource = useStore((s) => s.constraintSource);
   const buildingLevels = useStore((s) => s.buildingLevels);
+  const worldGen2 = useStore((s) => s.worldGen2);
   const theme = useStore((s) => s.theme);
   const isDark = theme === 'dark';
 
   const extractorLevel = buildingLevels.get('extractor') ?? 1;
-  const ratePerExtractor = EXTRACTOR_RATES[extractorLevel - 1];
+  const ratePerExtractor = getExtractorRates(worldGen2)[extractorLevel - 1];
 
   if (!productionResult || productionResult.rawResources.size === 0) {
     return (

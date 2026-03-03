@@ -35,9 +35,10 @@ export function findPracticalRates(
   referenceResult: ProductionResult,
   budget: number,
   extractorLevel: number,
-  beltSpeed: number
+  beltSpeed: number,
+  extractorRates: number[] = EXTRACTOR_RATES
 ): PracticalRateResult {
-  const ratePerExtractor = EXTRACTOR_RATES[extractorLevel - 1];
+  const ratePerExtractor = extractorRates[extractorLevel - 1];
 
   // Compute extractors needed per resource at rate=1
   const extractorsAtRate1 = new Map<string, number>();

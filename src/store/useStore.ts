@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { BuildingType, EXTRACTOR_RATES } from '../data/buildings';
+import { BuildingType, getExtractorRates } from '../data/buildings';
 import { DEFAULT_BELT_SPEED } from '../data/belts';
 import {
   calculateProduction,
@@ -125,6 +125,9 @@ interface CalculatorState {
   referenceResult: ProductionResult | null;
   bestPracticalRates: BestPracticalRates | null;
 
+  // World Gen 2.0 extractor rates
+  worldGen2: boolean;
+
   // Constraint tracking - which input is driving the calculation
   constraintSource: ConstraintSource;
 
@@ -147,6 +150,7 @@ interface CalculatorState {
   setCleanRatesOnly: (value: boolean) => void;
   setAutoIntegerMode: (value: boolean) => void;
   applyBestRate: () => void;
+  setWorldGen2: (value: boolean) => void;
   setResourceConstraints: (constraints: ResourceConstraint[]) => void;
   setRateFromBuildingCount: (buildingType: BuildingType, count: number) => void;
   setRateFromItemBuildingCount: (itemId: string, count: number) => void;
@@ -221,6 +225,7 @@ export const useStore = create<CalculatorState>()(
       reverseResult: null,
       referenceResult: null,
       bestPracticalRates: null,
+      worldGen2: false,
       constraintSource: { type: 'rate' } as ConstraintSource,
       productionResult: null,
       beltResult: null,
@@ -301,8 +306,13 @@ export const useStore = create<CalculatorState>()(
         }
       },
 
+      setWorldGen2: (value) => {
+        set({ worldGen2: value });
+        get().recalculate();
+      },
+
       applyBestRate: () => {
-        const { bestPracticalRates, targetItemId, recipeSelections, buildingLevels, beltSpeed } = get();
+        const { bestPracticalRates, targetItemId, recipeSelections, buildingLevels, beltSpeed, worldGen2 } = get();
 
         // Prefer bestSimple (fewest extractors with good fractions), fall back to bestAllInteger
         const best = bestPracticalRates?.bestSimple ?? bestPracticalRates?.bestAllInteger;
@@ -314,7 +324,7 @@ export const useStore = create<CalculatorState>()(
 
         // Fallback to existing logic
         if (!targetItemId) return;
-        const refResult = calculateProduction(targetItemId, 1, recipeSelections, buildingLevels);
+        const refResult = calculateProduction(targetItemId, 1, recipeSelections, buildingLevels, getExtractorRates(worldGen2));
         const bestCandidate = findBestAllIntegerScale(refResult, 100, beltSpeed);
         if (bestCandidate) {
           set({ targetRate: bestCandidate.scale });
@@ -337,7 +347,7 @@ export const useStore = create<CalculatorState>()(
       },
 
       setRateFromBuildingCount: (buildingType, count) => {
-        const { targetItemId, recipeSelections, buildingLevels } = get();
+        const { targetItemId, recipeSelections, buildingLevels, worldGen2 } = get();
         if (!targetItemId || count <= 0) return;
 
         // Calculate production at rate=1 to get the building count per unit rate
@@ -345,7 +355,8 @@ export const useStore = create<CalculatorState>()(
           targetItemId,
           1,
           recipeSelections,
-          buildingLevels
+          buildingLevels,
+          getExtractorRates(worldGen2)
         );
 
         // Find the building count at rate=1
@@ -382,7 +393,7 @@ export const useStore = create<CalculatorState>()(
       },
 
       setRateFromResourceAmount: (resourceId, ratePerMinute) => {
-        const { targetItemId, recipeSelections, buildingLevels } = get();
+        const { targetItemId, recipeSelections, buildingLevels, worldGen2 } = get();
         if (!targetItemId || ratePerMinute <= 0) return;
 
         // Calculate production at rate=1 to get the resource rate per unit output
@@ -390,7 +401,8 @@ export const useStore = create<CalculatorState>()(
           targetItemId,
           1,
           recipeSelections,
-          buildingLevels
+          buildingLevels,
+          getExtractorRates(worldGen2)
         );
 
         // Find the resource rate at rate=1
@@ -409,11 +421,12 @@ export const useStore = create<CalculatorState>()(
       },
 
       setRateFromExtractorCount: (resourceId, extractorCount) => {
-        const { targetItemId, recipeSelections, buildingLevels, resourceConstraints } = get();
+        const { targetItemId, recipeSelections, buildingLevels, resourceConstraints, worldGen2 } = get();
         if (!targetItemId || extractorCount <= 0) return;
 
         const extractorLevel = buildingLevels.get('extractor') ?? 1;
-        const ratePerExtractor = EXTRACTOR_RATES[extractorLevel - 1];
+        const extractorRates = getExtractorRates(worldGen2);
+        const ratePerExtractor = extractorRates[extractorLevel - 1];
         const resourceRate = extractorCount * ratePerExtractor;
 
         // Calculate production at rate=1 to get the resource rate per unit output
@@ -421,7 +434,8 @@ export const useStore = create<CalculatorState>()(
           targetItemId,
           1,
           recipeSelections,
-          buildingLevels
+          buildingLevels,
+          extractorRates
         );
 
         const refRate = referenceResult.rawResources.get(resourceId);
@@ -548,8 +562,10 @@ export const useStore = create<CalculatorState>()(
           buildingLevels,
           beltSpeed,
           resourceConstraints,
+          worldGen2,
         } = get();
 
+        const extractorRates = getExtractorRates(worldGen2);
         const isMultiTarget = targets.length > 1;
 
         if (!isMultiTarget) {
@@ -569,7 +585,8 @@ export const useStore = create<CalculatorState>()(
             targetItemId,
             targetRate,
             recipeSelections,
-            buildingLevels
+            buildingLevels,
+            extractorRates
           );
 
           const beltResult = calculateBeltRequirements(result, beltSpeed);
@@ -583,7 +600,8 @@ export const useStore = create<CalculatorState>()(
               resourceConstraints,
               recipeSelections,
               buildingLevels,
-              beltSpeed
+              beltSpeed,
+              extractorRates
             );
             reverseResult = reverse;
           }
@@ -593,12 +611,13 @@ export const useStore = create<CalculatorState>()(
             targetItemId,
             1,
             recipeSelections,
-            buildingLevels
+            buildingLevels,
+            extractorRates
           );
           const extractorLevel = buildingLevels.get('extractor') ?? 1;
           let bestPracticalRates: BestPracticalRates | null = null;
           try {
-            bestPracticalRates = findBestPracticalRates(referenceResult, extractorLevel, beltSpeed);
+            bestPracticalRates = findBestPracticalRates(referenceResult, extractorLevel, beltSpeed, extractorRates);
           } catch {
             // Complex recipes can exceed optimization limits; degrade gracefully
             bestPracticalRates = null;
@@ -616,7 +635,8 @@ export const useStore = create<CalculatorState>()(
           const result = calculateMultiProduction(
             validTargets.map((t) => ({ itemId: t.itemId, rate: t.rate })),
             recipeSelections,
-            buildingLevels
+            buildingLevels,
+            extractorRates
           );
 
           const beltResult = calculateBeltRequirements(result, beltSpeed);
@@ -649,6 +669,7 @@ export const useStore = create<CalculatorState>()(
         blueprintMergeMode: state.blueprintMergeMode,
         cleanRatesOnly: state.cleanRatesOnly,
         autoIntegerMode: state.autoIntegerMode,
+        worldGen2: state.worldGen2,
         resourceConstraints: state.resourceConstraints,
         collapsedSections: state.collapsedSections,
         blueprintProgress: mapToObject(state.blueprintProgress),
@@ -724,6 +745,7 @@ export const useStore = create<CalculatorState>()(
               state.buildingLevels.set(k as BuildingType, v);
             }
           }
+          if (urlState.worldGen2 !== undefined) state.worldGen2 = urlState.worldGen2;
 
           // Trigger initial calculation
           setTimeout(() => state.recalculate(), 0);
@@ -745,6 +767,7 @@ if (typeof window !== 'undefined') {
       recipeSelections: state.recipeSelections,
       buildingLevels: state.buildingLevels,
       targets: state.targets,
+      worldGen2: state.worldGen2,
     });
   });
 

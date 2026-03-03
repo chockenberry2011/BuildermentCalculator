@@ -22,6 +22,13 @@ const STANDARD_MULTIPLIERS = [1, 1.5, 2, 3, 4];
 // Extractor output rates per minute for levels 1-5
 export const EXTRACTOR_RATES = [7.5, 11.25, 15, 22.5, 30];
 
+// World Gen 2.0 extractor output rates per minute for levels 1-5
+export const EXTRACTOR_RATES_WORLD_GEN_2 = [15, 30, 60, 120, 150];
+
+export function getExtractorRates(worldGen2: boolean): number[] {
+  return worldGen2 ? EXTRACTOR_RATES_WORLD_GEN_2 : EXTRACTOR_RATES;
+}
+
 export const BUILDINGS: Record<BuildingType, BuildingInfo> = {
   extractor: {
     id: 'extractor',

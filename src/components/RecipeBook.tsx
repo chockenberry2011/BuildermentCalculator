@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ALL_RECIPES, Recipe } from '../data/recipes';
 import { ITEMS } from '../data/items';
-import { BUILDINGS, BuildingType, EXTRACTOR_RATES } from '../data/buildings';
+import { BUILDINGS, BuildingType, getExtractorRates } from '../data/buildings';
 import { useStore } from '../store/useStore';
 
 function getOutputRate(recipe: Recipe, level: number): number {
@@ -105,6 +105,7 @@ function RecipeCard({ recipe, currentLevel, isDark }: RecipeCardProps) {
 export function RecipeBook() {
   const theme = useStore((s) => s.theme);
   const buildingLevels = useStore((s) => s.buildingLevels);
+  const worldGen2 = useStore((s) => s.worldGen2);
   const isDark = theme === 'dark';
   const [search, setSearch] = useState('');
 
@@ -187,7 +188,7 @@ export function RecipeBook() {
                   {item.name}
                 </span>
                 <span className={`ml-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {formatRate(EXTRACTOR_RATES[extractorLevel - 1])}/min per extractor
+                  {formatRate(getExtractorRates(worldGen2)[extractorLevel - 1])}/min per extractor
                 </span>
               </div>
             ))}
