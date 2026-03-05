@@ -29,6 +29,7 @@ export interface BlueprintNodeData {
   isDimmed?: boolean;
   isSelected?: boolean;
   orientation?: BlueprintOrientation;
+  hasUpstreamFraction?: boolean;
   progressState?: BlueprintProgressState | false;
   onToggleProgress?: () => void;
   [key: string]: unknown;
@@ -368,6 +369,7 @@ function FullNode({
   isRoot,
   isSelected,
   orientation,
+  hasUpstreamFraction,
   progressState,
   onToggleProgress,
 }: {
@@ -380,6 +382,7 @@ function FullNode({
   isRoot: boolean;
   isSelected: boolean;
   orientation: BlueprintOrientation;
+  hasUpstreamFraction?: boolean;
   progressState: BlueprintProgressState | false;
   onToggleProgress?: () => void;
 }) {
@@ -457,7 +460,7 @@ function FullNode({
           </div>
         )}
         {count && !count.isInteger && !isRoot && (
-          <SplitBadge count={building!.count} isDark={isDark} outputQuantity={flatNode.recipe?.outputQuantity} />
+          <SplitBadge count={building!.count} isDark={isDark} autoRegulated={hasUpstreamFraction} />
         )}
         {building && building.level < building.configuredLevel && (
           <LevelBadge building={building} isDark={isDark} />
@@ -499,7 +502,7 @@ function FullNode({
 }
 
 export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
-  const { flatNode, inputItemIds, outputItemIds, inputIngredients, isDark, isRoot, isDimmed, isSelected, orientation, progressState, onToggleProgress } = data as BlueprintNodeData;
+  const { flatNode, inputItemIds, outputItemIds, inputIngredients, isDark, isRoot, isDimmed, isSelected, orientation, hasUpstreamFraction, progressState, onToggleProgress } = data as BlueprintNodeData;
   const accentColor = getItemColor(flatNode.itemId);
   const zoomLevel: ZoomLevel = useZoomLevel();
   const orient = orientation ?? 'horizontal';
@@ -554,6 +557,7 @@ export const BlueprintNode = memo(function BlueprintNode({ data }: NodeProps) {
         isRoot={isRoot}
         isSelected={isSelected ?? false}
         orientation={orient}
+        hasUpstreamFraction={hasUpstreamFraction}
         progressState={progress}
         onToggleProgress={onToggleProgress}
       />

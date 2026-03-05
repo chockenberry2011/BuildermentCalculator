@@ -67,10 +67,12 @@ export function calculateBuildingCount(
   recipe: Recipe,
   buildingLevel: number
 ): Rational {
-  // Output per minute at level 1 = (outputQuantity / craftTime) * 60
+  // Output per minute at level 1 = (1 / craftTime) * 60
   // At higher levels, multiply by speed multiplier
+  // Note: outputQuantity does not affect building throughput — the building's
+  // output port speed is fixed. Multi-output recipes reduce craft rate instead.
   const multiplier = getBuildingMultiplier(recipe.building, buildingLevel);
-  const baseOutputPerMinute = (recipe.outputQuantity / recipe.craftTime) * 60;
+  const baseOutputPerMinute = (1 / recipe.craftTime) * 60;
   const outputPerBuildingPerMinute = baseOutputPerMinute * multiplier;
 
   // Buildings needed = rate / output per building

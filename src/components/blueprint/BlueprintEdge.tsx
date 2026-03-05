@@ -8,7 +8,7 @@ import {
 import { FlatEdge } from '../../core/GraphFlattener';
 import { Rational } from '../../core/math/rational';
 import { BeltStatus } from '../../data/belts';
-import { getBeltDistribution } from '../../core/beltDistribution';
+import { getBeltDistribution, getTargetBuildingDistribution } from '../../core/beltDistribution';
 import { getItemColor } from '../../data/itemColors';
 import { BeltIcon } from '../BeltIcon';
 import { BuildingIcon } from '../BuildingIcon';
@@ -85,7 +85,7 @@ export const BlueprintEdge = memo(function BlueprintEdge({
 
   if (!data) return null;
 
-  const { flatEdge, beltStatus, beltsNeeded, utilization, maxRate, isDark, isDimmed, sourceBuildingCount, sourceTotalRate, sourceBuildingType, sourceBuildingName, sourceIsRaw, targetBuildingCount, targetBuildingType, targetBuildingName: _targetBuildingName, stepPosition, splitterTree } = data;
+  const { flatEdge, beltStatus, beltsNeeded, utilization, maxRate, isDark, isDimmed, sourceBuildingCount, sourceTotalRate, sourceBuildingType, sourceBuildingName, sourceIsRaw, targetBuildingCount, targetBuildingType, targetBuildingName, stepPosition, splitterTree } = data;
   const rate = flatEdge.rate.toNumber();
   const itemColor = getItemColor(flatEdge.fromItemId);
   const statusColor = STATUS_COLORS[beltStatus];
@@ -201,6 +201,12 @@ export const BlueprintEdge = memo(function BlueprintEdge({
       ? getBeltDistribution(targetBuildingCount, beltsNeeded)
       : null;
 
+  // Per-target-building distribution (e.g. "16 extractors per furnace")
+  const targetBuildingDist =
+    buildingShare && targetBuildingCount && targetBuildingName
+      ? getTargetBuildingDistribution(buildingShare, targetBuildingCount, targetBuildingName)
+      : null;
+
   // Per-belt throughput
   const perBeltRate = beltsNeeded > 1 ? rate / beltsNeeded : null;
 
@@ -271,7 +277,24 @@ export const BlueprintEdge = memo(function BlueprintEdge({
           </div>
         </>
       )}
-      {(distribution || targetDistribution) && (
+      {targetBuildingDist && (
+        <>
+          <div className={`border-t my-2 ${dividerClass}`} />
+          <div className={`${labelClass} mb-1`}>Distribution per {targetBuildingName?.toLowerCase() ?? 'target'}</div>
+          <div className="font-medium flex items-center gap-1">
+            {sourceBuildingType && (
+              <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={flatEdge.fromItemId} size="sm" />
+            )}
+            {targetBuildingDist.shortLabel}
+          </div>
+          {targetBuildingDist.partialTargetFraction && targetBuildingDist.partialTargetSourceCount && (
+            <div className={`${labelClass} text-[11px] ml-5`}>
+              {targetBuildingDist.fullTargetBuildings} full × {targetBuildingDist.fullTargetSourceCount.isInteger() ? targetBuildingDist.fullTargetSourceCount.toNumber() : targetBuildingDist.fullTargetSourceCount.toDecimalString()} + 1 partial ({targetBuildingDist.partialTargetFraction.numerator}/{targetBuildingDist.partialTargetFraction.denominator}) × {targetBuildingDist.partialTargetSourceCount.isInteger() ? targetBuildingDist.partialTargetSourceCount.toNumber() : targetBuildingDist.partialTargetSourceCount.toDecimalString()}
+            </div>
+          )}
+        </>
+      )}
+      {!targetBuildingDist && (distribution || targetDistribution) && (
         <>
           <div className={`border-t my-2 ${dividerClass}`} />
           <div className={`${labelClass} mb-1`}>Distribution per belt</div>

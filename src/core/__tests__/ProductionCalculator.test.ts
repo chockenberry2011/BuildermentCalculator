@@ -86,24 +86,24 @@ describe('calculateProduction', () => {
   });
 });
 
-describe('outputQuantity recipe corrections', () => {
-  it('iron_plating building count reflects outputQuantity=2 (40/min base rate at Lv1)', () => {
-    // outputQuantity=2, craftTime=3 → (2/3)*60 = 40/min per workshop
-    // 40/min target → exactly 1 workshop
+describe('outputQuantity building throughput', () => {
+  it('iron_plating building count uses craft rate, not item rate (20/min base at Lv1)', () => {
+    // outputQuantity=2, craftTime=3 → throughput = (1/3)*60 = 20/min per workshop
+    // 40/min target → 2 workshops
     const result = calculateProduction('iron_plating', 40, noRecipes, defaultLevels);
+    const node = result.root;
+    expect(node.building!.count.toNumber()).toBeCloseTo(2);
+  });
+
+  it('copper_wire building count uses craft rate, not item rate (30/min base at Lv1)', () => {
+    // outputQuantity=2, craftTime=2 → throughput = (1/2)*60 = 30/min per workshop
+    // 30/min target → 1 workshop
+    const result = calculateProduction('copper_wire', 30, noRecipes, defaultLevels);
     const node = result.root;
     expect(node.building!.count.toNumber()).toBeCloseTo(1);
   });
 
-  it('copper_wire building count reflects outputQuantity=2 (60/min base rate at Lv1)', () => {
-    // outputQuantity=2, craftTime=2 → (2/2)*60 = 60/min per workshop
-    // 30/min target → 0.5 workshops
-    const result = calculateProduction('copper_wire', 30, noRecipes, defaultLevels);
-    const node = result.root;
-    expect(node.building!.count.toNumber()).toBeCloseTo(0.5);
-  });
-
-  it('downstream ingredient demand rates are unchanged by outputQuantity fix', () => {
+  it('downstream ingredient demand rates are unchanged', () => {
     // copper_wire: quantity=3 / outputQuantity=2 = 1.5 copper_ingot per wire
     // At 30 wire/min → 45 copper_ingot/min demand
     const result = calculateProduction('copper_wire', 30, noRecipes, defaultLevels);

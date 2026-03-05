@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Rational } from '../math/rational';
-import { getBeltDistribution } from '../beltDistribution';
+import { getBeltDistribution, getTargetBuildingDistribution } from '../beltDistribution';
 
 describe('getBeltDistribution', () => {
   it('returns null for single belt', () => {
@@ -57,5 +57,62 @@ describe('getBeltDistribution', () => {
     expect(dist.tooltip).toContain('17');
     expect(dist.tooltip).toContain('2 belts');
     expect(dist.tooltip).toContain('per belt');
+  });
+});
+
+describe('getTargetBuildingDistribution', () => {
+  it('60 extractors / 3.75 furnaces → 16/furnace with partial breakdown', () => {
+    const dist = getTargetBuildingDistribution(
+      new Rational(60),
+      new Rational(15, 4), // 3.75
+      'Furnace'
+    )!;
+    expect(dist).not.toBeNull();
+    expect(dist.buildingsPerTarget.toNumber()).toBe(16);
+    expect(dist.fullTargetBuildings).toBe(3);
+    expect(dist.partialTargetFraction).not.toBeNull();
+    expect(dist.partialTargetFraction!.numerator).toBe(3);
+    expect(dist.partialTargetFraction!.denominator).toBe(4);
+    expect(dist.partialTargetSourceCount).not.toBeNull();
+    expect(dist.partialTargetSourceCount!.toNumber()).toBe(12);
+    expect(dist.shortLabel).toBe('16 /furnace');
+  });
+
+  it('integer target: 20 extractors / 4 furnaces → 5/furnace, no partial', () => {
+    const dist = getTargetBuildingDistribution(
+      new Rational(20),
+      new Rational(4),
+      'Furnace'
+    )!;
+    expect(dist).not.toBeNull();
+    expect(dist.buildingsPerTarget.toNumber()).toBe(5);
+    expect(dist.fullTargetBuildings).toBe(4);
+    expect(dist.partialTargetFraction).toBeNull();
+    expect(dist.partialTargetSourceCount).toBeNull();
+    expect(dist.shortLabel).toBe('5 /furnace');
+  });
+
+  it('returns null for single target', () => {
+    expect(getTargetBuildingDistribution(
+      new Rational(10),
+      new Rational(1),
+      'Furnace'
+    )).toBeNull();
+  });
+
+  it('returns null for zero target', () => {
+    expect(getTargetBuildingDistribution(
+      new Rational(10),
+      new Rational(0),
+      'Furnace'
+    )).toBeNull();
+  });
+
+  it('returns null for zero source', () => {
+    expect(getTargetBuildingDistribution(
+      new Rational(0),
+      new Rational(4),
+      'Furnace'
+    )).toBeNull();
   });
 });

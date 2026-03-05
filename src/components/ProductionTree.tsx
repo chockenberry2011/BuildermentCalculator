@@ -136,9 +136,12 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
           />
         )}
 
-        {buildingInfo && !buildingInfo.count.isInteger() && depth > 0 && (
-          <SplitBadge count={buildingInfo.count} isDark={isDark} outputQuantity={node.recipe?.outputQuantity} />
-        )}
+        {buildingInfo && !buildingInfo.count.isInteger() && depth > 0 && (() => {
+          const hasUpstreamFraction = node.children.some(
+            child => child.building && !child.building.count.isInteger()
+          );
+          return <SplitBadge count={buildingInfo.count} isDark={isDark} autoRegulated={hasUpstreamFraction} />;
+        })()}
 
         {buildingInfo && buildingInfo.level < buildingInfo.configuredLevel && (
           <LevelBadge building={buildingInfo} isDark={isDark} />

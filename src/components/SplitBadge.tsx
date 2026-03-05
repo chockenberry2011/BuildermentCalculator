@@ -35,11 +35,11 @@ interface SplitBadgeProps {
   count: Rational;
   variant?: 'pill' | 'line';
   isDark?: boolean;
-  outputQuantity?: number;
+  autoRegulated?: boolean;
 }
 
-export function SplitBadge({ count, variant = 'pill', isDark = false, outputQuantity }: SplitBadgeProps) {
-  const info = getSplitInfo(count, outputQuantity);
+export function SplitBadge({ count, variant = 'pill', isDark = false, autoRegulated = false }: SplitBadgeProps) {
+  const info = getSplitInfo(count);
   if (!info) return null;
 
   const score = fractionSimplicityScore(count);
@@ -49,15 +49,27 @@ export function SplitBadge({ count, variant = 'pill', isDark = false, outputQuan
   // Bad (<0.40): battery red bg, white text
   const tier = score >= 0.60 ? 'good' : score >= 0.40 ? 'decent' : 'bad';
 
-  const pillStyles = {
-    good:   'bg-green-600 text-white',
-    decent: 'bg-green-900/40 text-green-300',
-    bad:    'text-white',
-  };
-  const pillBg = tier === 'bad' ? '#DC2626' : undefined;
-  const iconColors = { good: 'white', decent: 'rgb(134,239,172)', bad: 'white' };
-  const lineStyles = { good: 'text-green-400', decent: 'text-green-300', bad: 'text-red-400' };
-  const lineIconColors = { good: 'rgb(74,222,128)', decent: 'rgb(134,239,172)', bad: 'rgb(248,113,113)' };
+  const pillStyles = autoRegulated
+    ? {
+        good:   'border border-green-600 text-green-400 bg-transparent',
+        decent: 'border border-green-700 text-green-500 bg-transparent',
+        bad:    'border border-red-500 text-red-400 bg-transparent',
+      }
+    : {
+        good:   'bg-green-600 text-white',
+        decent: 'bg-green-900/40 text-green-300',
+        bad:    'text-white',
+      };
+  const pillBg = !autoRegulated && tier === 'bad' ? '#DC2626' : undefined;
+  const iconColors = autoRegulated
+    ? { good: 'rgb(74,222,128)', decent: 'rgb(34,197,94)', bad: 'rgb(248,113,113)' }
+    : { good: 'white', decent: 'rgb(134,239,172)', bad: 'white' };
+  const lineStyles = autoRegulated
+    ? { good: 'text-green-600', decent: 'text-green-700', bad: 'text-red-600' }
+    : { good: 'text-green-400', decent: 'text-green-300', bad: 'text-red-400' };
+  const lineIconColors = autoRegulated
+    ? { good: 'rgb(22,163,74)', decent: 'rgb(21,128,61)', bad: 'rgb(220,38,38)' }
+    : { good: 'rgb(74,222,128)', decent: 'rgb(134,239,172)', bad: 'rgb(248,113,113)' };
 
   // Shared popover content for both variants
   const qualityLabel = getQualityLabel(score);
@@ -65,35 +77,38 @@ export function SplitBadge({ count, variant = 'pill', isDark = false, outputQuan
   const dividerClass = isDark ? 'border-gray-600' : 'border-gray-200';
   const labelClass = isDark ? 'text-gray-400' : 'text-gray-500';
 
-  const batchSuffix = outputQuantity && outputQuantity > 1 ? ` (batch of ${outputQuantity})` : '';
-  const tooltipText = `Build ${info.actualBuildings}: ${info.fullBuildings} full + 1 splits ${info.splitNumerator}/${info.splitDenominator}${batchSuffix}`;
+  const tooltipText = `Build ${info.actualBuildings}: ${info.fullBuildings} at full rate, 1 at ${info.splitNumerator}/${info.splitDenominator} input`;
 
   const popoverDetail = (
     <div className="space-y-1.5">
-      <div className="font-semibold text-sm mb-2">Split Details</div>
+      <div className="font-semibold text-sm mb-2">
+        Split Details{autoRegulated ? ' (auto)' : ''}
+      </div>
       <div className="flex justify-between">
         <span className={labelClass}>Actual buildings</span>
         <span className="font-medium">{info.actualBuildings}</span>
       </div>
       <div className="flex justify-between">
-        <span className={labelClass}>Full output</span>
+        <span className={labelClass}>Full rate</span>
         <span className="font-medium">{info.fullBuildings}</span>
       </div>
       <div className="flex justify-between">
-        <span className={labelClass}>Split ratio</span>
-        <span className="font-medium">{info.splitNumerator}/{info.splitDenominator}</span>
+        <span className={labelClass}>Partial input</span>
+        <span className="font-medium">{info.splitNumerator}/{info.splitDenominator} feed</span>
       </div>
-      {outputQuantity && outputQuantity > 1 && (
-        <div className="flex justify-between">
-          <span className={labelClass}>Batch size</span>
-          <span className="font-medium">{outputQuantity} per craft</span>
-        </div>
-      )}
       <div className={`border-t my-2 ${dividerClass}`} />
       <div className="flex justify-between items-center">
         <span className={labelClass}>Simplicity</span>
         <span className="font-medium" style={{ color: qualityColor }}>{qualityLabel}</span>
       </div>
+      {autoRegulated && (
+        <>
+          <div className={`border-t my-2 ${dividerClass}`} />
+          <div className={`text-xs ${labelClass} italic`}>
+            Input regulated by upstream — may not need a dedicated input splitter
+          </div>
+        </>
+      )}
     </div>
   );
 

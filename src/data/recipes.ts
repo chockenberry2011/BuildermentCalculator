@@ -24,7 +24,7 @@ const DEFAULT_RECIPES: Recipe[] = [
     outputId: 'wood_plank',
     outputQuantity: 1,
     building: 'workshop',
-    craftTime: 1,
+    craftTime: 4,
     ingredients: [{ itemId: 'wood_log', quantity: 1 }],
     isAlternate: false,
   },

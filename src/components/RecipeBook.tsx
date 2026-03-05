@@ -6,12 +6,12 @@ import { useStore } from '../store/useStore';
 
 function getOutputRate(recipe: Recipe, level: number): number {
   const multiplier = BUILDINGS[recipe.building].speedMultipliers[level - 1];
-  return (recipe.outputQuantity / recipe.craftTime) * 60 * multiplier;
+  return (1 / recipe.craftTime) * 60 * multiplier;
 }
 
 function getInputRate(recipe: Recipe, ingredientQuantity: number, level: number): number {
   const multiplier = BUILDINGS[recipe.building].speedMultipliers[level - 1];
-  return (ingredientQuantity / recipe.craftTime) * 60 * multiplier;
+  return (ingredientQuantity / recipe.craftTime) * 60 * multiplier / recipe.outputQuantity;
 }
 
 function formatRate(rate: number): string {

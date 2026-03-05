@@ -95,6 +95,12 @@ function buildReactFlowData(
     1,
   );
 
+  // Build node lookup for O(1) access by nodeKey
+  const nodeMap = new Map<string, FlatNode>();
+  for (const node of dag.nodes) {
+    nodeMap.set(node.nodeKey, node);
+  }
+
   const rfNodes: Node[] = dag.nodes.map((flatNode) => {
     const pos = positions.get(flatNode.nodeKey) ?? { x: 0, y: 0 };
     const nodeInputs = inputsOf.get(flatNode.nodeKey) ?? [];
@@ -106,6 +112,12 @@ function buildReactFlowData(
       itemName: edge.itemName,
       rate: edge.rate,
     }));
+
+    // Check if any upstream (ingredient) node has a fractional building count
+    const hasUpstreamFraction = inEdges.some((edge) => {
+      const sourceNode = nodeMap.get(edge.fromNodeKey);
+      return sourceNode?.building && !sourceNode.building.count.isInteger();
+    });
 
     return {
       id: flatNode.nodeKey,
@@ -119,6 +131,7 @@ function buildReactFlowData(
         isDark,
         isRoot: rootItemIds ? rootItemIds.has(flatNode.itemId) : flatNode.itemId === rootItemId,
         orientation,
+        hasUpstreamFraction,
         progressState: blueprintProgress?.get(flatNode.nodeKey) ?? false,
         onToggleProgress: toggleBlueprintProgress ? () => toggleBlueprintProgress(flatNode.nodeKey) : undefined,
       } satisfies BlueprintNodeData,
