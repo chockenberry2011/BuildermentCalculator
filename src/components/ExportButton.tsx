@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { BUILDINGS } from '../data/buildings';
 import { ITEMS } from '../data/items';
@@ -8,6 +9,7 @@ export function ExportButton() {
   const targetRate = useStore((s) => s.targetRate);
   const theme = useStore((s) => s.theme);
   const isDark = theme === 'dark';
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   const handleExport = () => {
     if (!productionResult) return;
@@ -27,7 +29,7 @@ export function ExportButton() {
       const value = count.toNumber();
       const isInt = Math.abs(value - Math.round(value)) < 0.001;
       text += `${building?.name ?? buildingType}: ${isInt ? Math.round(value) : value.toFixed(2)}`;
-      text += isInt ? ' ✓\n' : '\n';
+      text += isInt ? ' \u2713\n' : '\n';
     }
     text += `\n`;
 
@@ -42,10 +44,12 @@ export function ExportButton() {
     // Copy to clipboard
     navigator.clipboard.writeText(text).then(
       () => {
-        alert('Production plan copied to clipboard!');
+        setFeedback('Copied!');
+        setTimeout(() => setFeedback(null), 2000);
       },
       () => {
-        alert('Failed to copy to clipboard');
+        setFeedback('Failed');
+        setTimeout(() => setFeedback(null), 2000);
       }
     );
   };
@@ -70,7 +74,7 @@ export function ExportButton() {
           d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
         />
       </svg>
-      <span className="hidden sm:inline">Copy to Clipboard</span>
+      <span className="hidden sm:inline">{feedback ?? 'Copy to Clipboard'}</span>
     </button>
   );
 }

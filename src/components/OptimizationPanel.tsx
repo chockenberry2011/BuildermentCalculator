@@ -64,7 +64,7 @@ export function OptimizationPanel() {
         <RateCard
           optimum={bestAllInteger!}
           title="Recommended"
-          icon="&#10003;"
+          icon={"\u2713"}
           colorScheme="green"
           isActive={Math.abs(targetRate - bestAllInteger!.rate) < 0.001}
           onApply={() => setTargetRate(bestAllInteger!.rate)}
@@ -80,7 +80,7 @@ export function OptimizationPanel() {
             <RateCard
               optimum={bestSimple}
               title="Simplest"
-              icon="&#9733;"
+              icon={"\u2605"}
               colorScheme="amber"
               isActive={Math.abs(targetRate - bestSimple.rate) < 0.001}
               onApply={() => setTargetRate(bestSimple.rate)}
@@ -94,7 +94,7 @@ export function OptimizationPanel() {
             <RateCard
               optimum={bestAllInteger}
               title="Perfect Ratio"
-              icon="&#10003;"
+              icon={"\u2713"}
               colorScheme="green"
               isActive={Math.abs(targetRate - bestAllInteger.rate) < 0.001}
               onApply={() => setTargetRate(bestAllInteger.rate)}
@@ -222,7 +222,7 @@ function RateCard({
 
       {/* Title row */}
       <div className="flex items-center gap-1 sm:gap-1.5">
-        <span className={`${colors.icon} text-sm flex-shrink-0`} dangerouslySetInnerHTML={{ __html: icon }} />
+        <span className={`${colors.icon} text-sm flex-shrink-0`}>{icon}</span>
         <span className={`font-semibold text-xs sm:text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
           {title}
         </span>

@@ -187,8 +187,8 @@ export function findOptimalScales(
 
   // Add scales that might give clean belt multiples
   // These are multiples of beltSpeed / throughput for each connection
-  const baseThrouhputs = collectThroughputs(result);
-  for (const throughput of baseThrouhputs) {
+  const baseThroughputs = collectThroughputs(result);
+  for (const throughput of baseThroughputs) {
     if (throughput > 0) {
       // Find scales where this throughput becomes a clean belt multiple
       for (let numBelts = 1; numBelts <= 10; numBelts++) {

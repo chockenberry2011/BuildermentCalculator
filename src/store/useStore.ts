@@ -79,7 +79,9 @@ export type ConstraintSource =
   | { type: 'extractor'; resourceId: string };
 
 interface CalculatorState {
-  // Target settings
+  // Target settings — intentionally duplicated with targets[0] for backward
+  // compatibility with single-target URL params (?item=&rate=) and localStorage.
+  // All setters keep both in sync. Defer removal to post-beta.
   targetItemId: string;
   targetRate: number;
 
@@ -107,9 +109,6 @@ interface CalculatorState {
 
   // Blueprint node position overrides (nodeKey → {x, y})
   blueprintPositions: Map<string, { x: number; y: number }>;
-
-  // Feature 1: Clean rates filter
-  cleanRatesOnly: boolean;
 
   // Feature 4: Auto-integer mode
   autoIntegerMode: boolean;
@@ -147,7 +146,6 @@ interface CalculatorState {
   toggleTheme: () => void;
   setBeltSpeed: (speed: number) => void;
   toggleBeltInfo: () => void;
-  setCleanRatesOnly: (value: boolean) => void;
   setAutoIntegerMode: (value: boolean) => void;
   applyBestRate: () => void;
   setWorldGen2: (value: boolean) => void;
@@ -218,7 +216,6 @@ export const useStore = create<CalculatorState>()(
       collapsedSections: {},
       blueprintProgress: new Map(),
       blueprintPositions: new Map(),
-      cleanRatesOnly: false,
       autoIntegerMode: false,
       fractionalProposals: [],
       resourceConstraints: [],
@@ -293,10 +290,6 @@ export const useStore = create<CalculatorState>()(
 
       toggleBeltInfo: () => {
         set((state) => ({ showBeltInfo: !state.showBeltInfo }));
-      },
-
-      setCleanRatesOnly: (value) => {
-        set({ cleanRatesOnly: value });
       },
 
       setAutoIntegerMode: (value) => {
@@ -506,7 +499,6 @@ export const useStore = create<CalculatorState>()(
           reverseResult: null,
           fractionalProposals: [],
           autoIntegerMode: false,
-          cleanRatesOnly: false,
         });
         get().recalculate();
       },
@@ -567,88 +559,94 @@ export const useStore = create<CalculatorState>()(
 
         const extractorRates = getExtractorRates(worldGen2);
         const isMultiTarget = targets.length > 1;
+        const nullResults = { productionResult: null, beltResult: null, fractionalProposals: [] as FractionalProposal[], reverseResult: null, referenceResult: null, bestPracticalRates: null };
 
         if (!isMultiTarget) {
           // Single target path (preserves optimization panel behavior)
-          if (!targetItemId) {
-            set({ productionResult: null, beltResult: null, fractionalProposals: [], reverseResult: null, referenceResult: null, bestPracticalRates: null });
+          if (!targetItemId || targetRate <= 0) {
+            set(nullResults);
             return;
           }
 
-          if (targetRate <= 0) {
-            set({ productionResult: null, beltResult: null, fractionalProposals: [], reverseResult: null, referenceResult: null, bestPracticalRates: null });
-            return;
-          }
-
-          // Always calculate production from targetRate
-          const result = calculateProduction(
-            targetItemId,
-            targetRate,
-            recipeSelections,
-            buildingLevels,
-            extractorRates
-          );
-
-          const beltResult = calculateBeltRequirements(result, beltSpeed);
-          const proposals = generateProposals(result, targetRate, beltSpeed);
-
-          // If resource constraints exist, compute reverse result for utilization info
-          let reverseResult: ReverseResult | null = null;
-          if (resourceConstraints.length > 0) {
-            const reverse = calculateFromResources(
+          try {
+            // Always calculate production from targetRate
+            const result = calculateProduction(
               targetItemId,
-              resourceConstraints,
+              targetRate,
               recipeSelections,
               buildingLevels,
-              beltSpeed,
               extractorRates
             );
-            reverseResult = reverse;
-          }
 
-          // Always compute reference result at rate=1 and best practical rates
-          const referenceResult = calculateProduction(
-            targetItemId,
-            1,
-            recipeSelections,
-            buildingLevels,
-            extractorRates
-          );
-          const extractorLevel = buildingLevels.get('extractor') ?? 1;
-          let bestPracticalRates: BestPracticalRates | null = null;
-          try {
-            bestPracticalRates = findBestPracticalRates(referenceResult, extractorLevel, beltSpeed, extractorRates);
+            const beltResult = calculateBeltRequirements(result, beltSpeed);
+            const proposals = generateProposals(result, targetRate, beltSpeed);
+
+            // If resource constraints exist, compute reverse result for utilization info
+            let reverseResult: ReverseResult | null = null;
+            if (resourceConstraints.length > 0) {
+              const reverse = calculateFromResources(
+                targetItemId,
+                resourceConstraints,
+                recipeSelections,
+                buildingLevels,
+                beltSpeed,
+                extractorRates
+              );
+              reverseResult = reverse;
+            }
+
+            // Always compute reference result at rate=1 and best practical rates
+            const referenceResult = calculateProduction(
+              targetItemId,
+              1,
+              recipeSelections,
+              buildingLevels,
+              extractorRates
+            );
+            const extractorLevel = buildingLevels.get('extractor') ?? 1;
+            let bestPracticalRates: BestPracticalRates | null = null;
+            try {
+              bestPracticalRates = findBestPracticalRates(referenceResult, extractorLevel, beltSpeed, extractorRates);
+            } catch {
+              // Complex recipes can exceed optimization limits; degrade gracefully
+              bestPracticalRates = null;
+            }
+
+            set({ productionResult: result, beltResult, fractionalProposals: proposals, reverseResult, referenceResult, bestPracticalRates });
           } catch {
-            // Complex recipes can exceed optimization limits; degrade gracefully
-            bestPracticalRates = null;
+            // Calculation error — clear results rather than leaving broken state
+            set(nullResults);
           }
-
-          set({ productionResult: result, beltResult, fractionalProposals: proposals, reverseResult, referenceResult, bestPracticalRates });
         } else {
           // Multi-target path
           const validTargets = targets.filter((t) => t.itemId && t.rate > 0);
           if (validTargets.length === 0) {
-            set({ productionResult: null, beltResult: null, fractionalProposals: [], reverseResult: null, referenceResult: null, bestPracticalRates: null });
+            set(nullResults);
             return;
           }
 
-          const result = calculateMultiProduction(
-            validTargets.map((t) => ({ itemId: t.itemId, rate: t.rate })),
-            recipeSelections,
-            buildingLevels,
-            extractorRates
-          );
+          try {
+            const result = calculateMultiProduction(
+              validTargets.map((t) => ({ itemId: t.itemId, rate: t.rate })),
+              recipeSelections,
+              buildingLevels,
+              extractorRates
+            );
 
-          const beltResult = calculateBeltRequirements(result, beltSpeed);
+            const beltResult = calculateBeltRequirements(result, beltSpeed);
 
-          set({
-            productionResult: result,
-            beltResult,
-            fractionalProposals: [],
-            reverseResult: null,
-            referenceResult: null,
-            bestPracticalRates: null,
-          });
+            set({
+              productionResult: result,
+              beltResult,
+              fractionalProposals: [],
+              reverseResult: null,
+              referenceResult: null,
+              bestPracticalRates: null,
+            });
+          } catch {
+            // Calculation error — clear results rather than leaving broken state
+            set(nullResults);
+          }
         }
       },
     }),
@@ -667,7 +665,6 @@ export const useStore = create<CalculatorState>()(
         optimizationDetailLevel: state.optimizationDetailLevel,
         blueprintOrientation: state.blueprintOrientation,
         blueprintMergeMode: state.blueprintMergeMode,
-        cleanRatesOnly: state.cleanRatesOnly,
         autoIntegerMode: state.autoIntegerMode,
         worldGen2: state.worldGen2,
         resourceConstraints: state.resourceConstraints,

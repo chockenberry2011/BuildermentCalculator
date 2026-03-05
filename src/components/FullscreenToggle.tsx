@@ -13,6 +13,7 @@ export function FullscreenToggle({ isFullscreen, onToggle }: FullscreenTogglePro
     <button
       onClick={onToggle}
       title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+      aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
       className={`flex items-center justify-center w-7 h-7 rounded-lg transition ${
         isDark
           ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'

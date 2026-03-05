@@ -48,7 +48,6 @@ export function generateProposals(
       result,
       currentRate,
       scaleDownFactor,
-      buildingType,
       floor,
       beltSpeed
     ) : null;
@@ -57,7 +56,6 @@ export function generateProposals(
       result,
       currentRate,
       scaleUpFactor,
-      buildingType,
       ceil,
       beltSpeed
     );
@@ -85,7 +83,6 @@ function evaluateScale(
   result: ProductionResult,
   currentRate: number,
   scaleFactor: number,
-  _targetBuilding: BuildingType,
   targetCount: number,
   beltSpeed: number
 ): ScalingSuggestion {
