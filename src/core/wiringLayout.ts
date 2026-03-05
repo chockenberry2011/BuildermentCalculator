@@ -46,7 +46,7 @@ const COMPRESS_THRESHOLD = 6;
  * @param sharedCount - Number of shared buildings (split across belts)
  */
 export function computeWiringLayout(
-  totalBuildings: number,
+  _totalBuildings: number,
   beltsNeeded: number,
   fullPerBelt: number,
   sharedCount: number

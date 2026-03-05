@@ -16,7 +16,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useStore, type BlueprintOrientation, type BlueprintMergeMode, type BlueprintProgressState } from '../store/useStore';
-import { flattenToDAG, layoutDAG, type FlatDAG } from '../core/GraphFlattener';
+import { flattenToDAG, layoutDAG, type FlatDAG, type FlatNode } from '../core/GraphFlattener';
 import { BlueprintNode, type BlueprintNodeData, type NodeInputInfo } from './blueprint/BlueprintNode';
 import { BlueprintEdge, type BlueprintEdgeData } from './blueprint/BlueprintEdge';
 import { BlueprintSearch } from './blueprint/BlueprintSearch';
