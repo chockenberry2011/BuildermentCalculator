@@ -1,6 +1,8 @@
 # Builderment Resource Calculator
 
-A production chain calculator for the [Builderment](https://builderment.com) factory-building game. Given target items and desired production rates, it calculates exact building counts, raw resource requirements, belt utilization, and optimal production scales.
+A companion tool for the [Builderment](https://builderment.com) factory-building game. It automates the math you'd otherwise do with pen and paper — calculating building counts, raw resource requirements, belt utilization, and optimal production scales based on the game's current formulas and data.
+
+This is a planning aid, not a substitute for understanding your factory. All calculations reflect today's game mechanics and may not account for future balance changes. Use it to save time on arithmetic and verify your designs, but always sanity-check the results against your actual in-game setup.
 
 ## Features
 
@@ -107,4 +109,4 @@ src/
 
 ## Disclaimer
 
-Not affiliated with Builderment or its developers. Game data is based on the Builderment game.
+Not affiliated with Builderment or its developers. Game data and formulas are based on the current version of Builderment and may become outdated as the game is updated. Always verify results against your in-game experience.
