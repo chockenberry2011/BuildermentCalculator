@@ -156,7 +156,7 @@ export function BadgePopover({ children, tooltipContent, popoverContent, isDark 
       {showPopover && createPortal(
         <div
           ref={popoverRef}
-          className={`z-[9999] min-w-[220px] rounded-lg border shadow-xl p-3 text-xs ${popoverBg}`}
+          className={`z-[9999] min-w-[220px] max-h-[70vh] overflow-y-auto rounded-lg border shadow-xl p-3 text-xs ${popoverBg}`}
           style={{ top: pos.top, left: pos.left, position: 'absolute' }}
         >
           <button

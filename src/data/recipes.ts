@@ -297,7 +297,7 @@ const DEFAULT_RECIPES: Recipe[] = [
     outputId: 'logic_circuit',
     outputQuantity: 1,
     building: 'machine_shop',
-    craftTime: 4,
+    craftTime: 6,
     ingredients: [
       { itemId: 'copper_wire', quantity: 3 },
       { itemId: 'silicon', quantity: 2 },
@@ -697,7 +697,7 @@ const ALTERNATE_RECIPES: Recipe[] = [
     outputId: 'logic_circuit',
     outputQuantity: 1,
     building: 'machine_shop',
-    craftTime: 4,
+    craftTime: 8,
     ingredients: [
       { itemId: 'iron_plating', quantity: 1 },
       { itemId: 'heat_sink', quantity: 1 },

@@ -25,6 +25,7 @@ import { getItemColor } from '../data/itemColors';
 import { BUILDINGS, getExtractorRates } from '../data/buildings';
 import { classifyBeltStatus, getBeltsNeeded, getBeltUtilization } from '../data/belts';
 import { buildSplitterTree, ratesToParts, type SplitterTreeInfo } from '../core/splitterTree';
+import { getTargetBuildingDistribution, getPhysicalBeltCount } from '../core/beltDistribution';
 
 const nodeTypes = { blueprint: BlueprintNode };
 const edgeTypes = { belt: BlueprintEdge };
@@ -231,6 +232,22 @@ function buildReactFlowData(
     const targetNode = nodeInfoMap.get(flatEdge.toNodeKey);
     const tgtBuilding = targetNode?.building ?? null;
 
+    const sourceBuildingCount = srcBuilding?.count ?? null;
+    const sourceTotalRate = sourceNode?.totalRate ?? null;
+    const targetBuildingCount = tgtBuilding?.count ?? null;
+    const targetBuildingName = tgtBuilding ? (BUILDINGS[tgtBuilding.buildingType]?.name ?? null) : null;
+
+    // Pre-compute building share and target distribution (moved from render-time)
+    const buildingShare = sourceBuildingCount && sourceTotalRate && !sourceTotalRate.isZero()
+      ? sourceBuildingCount.multiply(flatEdge.rate).divide(sourceTotalRate)
+      : null;
+
+    const targetBuildingDist = buildingShare && targetBuildingCount && targetBuildingName
+      ? getTargetBuildingDistribution(buildingShare, targetBuildingCount, targetBuildingName)
+      : null;
+
+    const physicalBeltInfo = getPhysicalBeltCount(targetBuildingDist, rate, beltSpeed);
+
     return {
       id: key,
       source: flatEdge.fromNodeKey,
@@ -245,16 +262,19 @@ function buildReactFlowData(
         utilization,
         maxRate,
         isDark,
-        sourceBuildingCount: srcBuilding?.count ?? null,
-        sourceTotalRate: sourceNode?.totalRate ?? null,
+        sourceBuildingCount,
+        sourceTotalRate,
         sourceBuildingType: srcBuilding?.buildingType ?? null,
         sourceBuildingName: srcBuilding ? (BUILDINGS[srcBuilding.buildingType]?.name ?? null) : null,
         sourceIsRaw: sourceNode?.isRaw ?? false,
-        targetBuildingCount: tgtBuilding?.count ?? null,
+        targetBuildingCount,
         targetBuildingType: tgtBuilding?.buildingType ?? null,
-        targetBuildingName: tgtBuilding ? (BUILDINGS[tgtBuilding.buildingType]?.name ?? null) : null,
+        targetBuildingName,
         stepPosition: stepPositions.get(key) ?? 0.5,
         splitterTree: splitterTrees.get(flatEdge.fromNodeKey) ?? null,
+        buildingShare,
+        targetBuildingDist,
+        physicalBeltInfo,
       } satisfies BlueprintEdgeData,
     };
   });

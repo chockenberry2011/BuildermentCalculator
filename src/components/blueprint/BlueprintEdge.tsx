@@ -8,7 +8,7 @@ import {
 import { FlatEdge } from '../../core/GraphFlattener';
 import { Rational } from '../../core/math/rational';
 import { BeltStatus } from '../../data/belts';
-import { getBeltDistribution, getTargetBuildingDistribution } from '../../core/beltDistribution';
+import { getBeltDistribution, type TargetBuildingDistribution, type PhysicalBeltInfo } from '../../core/beltDistribution';
 import { getItemColor } from '../../data/itemColors';
 import { BeltIcon } from '../BeltIcon';
 import { BuildingIcon } from '../BuildingIcon';
@@ -45,6 +45,12 @@ export interface BlueprintEdgeData {
   stepPosition: number;
   /** Splitter tree info for edges from multi-consumer source nodes */
   splitterTree: SplitterTreeInfo | null;
+  /** Pre-computed building share for this edge */
+  buildingShare: Rational | null;
+  /** Pre-computed target building distribution */
+  targetBuildingDist: TargetBuildingDistribution | null;
+  /** Pre-computed physical belt info based on wiring groups */
+  physicalBeltInfo: PhysicalBeltInfo | null;
   [key: string]: unknown;
 }
 
@@ -85,15 +91,13 @@ export const BlueprintEdge = memo(function BlueprintEdge({
 
   if (!data) return null;
 
-  const { flatEdge, beltStatus, beltsNeeded, utilization, maxRate, isDark, isDimmed, sourceBuildingCount, sourceTotalRate, sourceBuildingType, sourceBuildingName, sourceIsRaw, targetBuildingCount, targetBuildingType, targetBuildingName, stepPosition, splitterTree } = data;
+  const { flatEdge, beltStatus, beltsNeeded, utilization, maxRate, isDark, isDimmed, sourceBuildingCount, sourceBuildingType, sourceBuildingName, sourceIsRaw, targetBuildingCount, targetBuildingType, targetBuildingName, stepPosition, splitterTree, buildingShare, targetBuildingDist, physicalBeltInfo } = data;
   const rate = flatEdge.rate.toNumber();
   const itemColor = getItemColor(flatEdge.fromItemId);
   const statusColor = STATUS_COLORS[beltStatus];
 
-  // Compute per-edge building share (e.g. "12 of 34 extractors feed this line")
-  const buildingShare = sourceBuildingCount && sourceTotalRate && !sourceTotalRate.isZero()
-    ? sourceBuildingCount.multiply(flatEdge.rate).divide(sourceTotalRate)
-    : null;
+  // Use physical belt count when available, fall back to throughput-based
+  const displayBelts = physicalBeltInfo?.displayBelts ?? beltsNeeded;
 
   // Throughput-scaled stroke width
   const relativeWidth = maxRate > 0 ? rate / maxRate : 0.5;
@@ -132,16 +136,19 @@ export const BlueprintEdge = memo(function BlueprintEdge({
 
   // Build label content
   const rateText = `${formatRate(rate)}/min`;
-  const showBeltIndicator = beltStatus !== 'ok';
+  const showBeltIndicator = beltStatus !== 'ok' || displayBelts > 1;
 
   const pillBg = isDark ? 'bg-gray-800/90' : 'bg-white/90';
   const pillText = isDark ? 'text-gray-300' : 'text-gray-600';
   const pillBorder = beltStatus !== 'ok' ? '' : (isDark ? 'border-gray-600' : 'border-gray-300');
   const pillBorderStyle = beltStatus !== 'ok' ? statusColor : undefined;
 
+  // Indicator color: use blue for physical multi-belt even when throughput status is 'ok'
+  const indicatorColor = displayBelts > 1 && beltStatus === 'ok' ? STATUS_COLORS['multi-belt'] : statusColor;
+
   const utilizationPct = Math.round(utilization * 100);
-  const beltLabel = beltStatus === 'multi-belt'
-    ? `\u00D7${beltsNeeded}`
+  const beltLabel = displayBelts > 1
+    ? `\u00D7${displayBelts}`
     : `${utilizationPct}%`;
 
   const labelClass = isDark ? 'text-gray-400' : 'text-gray-500';
@@ -191,24 +198,18 @@ export const BlueprintEdge = memo(function BlueprintEdge({
 
   // Full zoom: complete render with popover on rate pill
   const distribution =
-    beltStatus === 'multi-belt' && buildingShare
-      ? getBeltDistribution(buildingShare, beltsNeeded)
+    displayBelts > 1 && buildingShare
+      ? getBeltDistribution(buildingShare, displayBelts)
       : null;
 
   // Target-side distribution: how many target buildings each belt serves
   const targetDistribution =
-    beltStatus === 'multi-belt' && targetBuildingCount
-      ? getBeltDistribution(targetBuildingCount, beltsNeeded)
-      : null;
-
-  // Per-target-building distribution (e.g. "16 extractors per furnace")
-  const targetBuildingDist =
-    buildingShare && targetBuildingCount && targetBuildingName
-      ? getTargetBuildingDistribution(buildingShare, targetBuildingCount, targetBuildingName)
+    displayBelts > 1 && targetBuildingCount
+      ? getBeltDistribution(targetBuildingCount, displayBelts)
       : null;
 
   // Per-belt throughput
-  const perBeltRate = beltsNeeded > 1 ? rate / beltsNeeded : null;
+  const perBeltRate = displayBelts > 1 ? rate / displayBelts : null;
 
   // Format building share for display
   const shareValue = buildingShare ? buildingShare.toNumber() : null;
@@ -254,8 +255,14 @@ export const BlueprintEdge = memo(function BlueprintEdge({
       <div className={`border-t my-2 ${dividerClass}`} />
       <div className="flex justify-between">
         <span className={labelClass}>Belts needed</span>
-        <span className="font-medium">{beltsNeeded}</span>
+        <span className="font-medium">{displayBelts}</span>
       </div>
+      {physicalBeltInfo && physicalBeltInfo.physicalBelts > physicalBeltInfo.throughputBelts && (
+        <div className="flex justify-between">
+          <span className={labelClass}>Belt capacity</span>
+          <span className="font-medium">{physicalBeltInfo.throughputBelts} (throughput)</span>
+        </div>
+      )}
       <div className="flex justify-between">
         <span className={labelClass}>Utilization</span>
         <span className="font-medium">{utilizationPct}%</span>
@@ -288,8 +295,15 @@ export const BlueprintEdge = memo(function BlueprintEdge({
             {targetBuildingDist.shortLabel}
           </div>
           {targetBuildingDist.partialTargetFraction && targetBuildingDist.partialTargetSourceCount && (
-            <div className={`${labelClass} text-[11px] ml-5`}>
-              {targetBuildingDist.fullTargetBuildings} full × {targetBuildingDist.fullTargetSourceCount.isInteger() ? targetBuildingDist.fullTargetSourceCount.toNumber() : targetBuildingDist.fullTargetSourceCount.toDecimalString()} + 1 partial ({targetBuildingDist.partialTargetFraction.numerator}/{targetBuildingDist.partialTargetFraction.denominator}) × {targetBuildingDist.partialTargetSourceCount.isInteger() ? targetBuildingDist.partialTargetSourceCount.toNumber() : targetBuildingDist.partialTargetSourceCount.toDecimalString()}
+            <div className={`${labelClass} text-[11px] ml-5 flex items-center gap-0.5 flex-wrap`}>
+              <span>{targetBuildingDist.fullTargetBuildings} full</span>
+              {targetBuildingType && <BuildingIcon buildingType={targetBuildingType as BuildingType} itemId={flatEdge.toItemId} size="sm" />}
+              <span>× {targetBuildingDist.fullTargetSourceCount.isInteger() ? targetBuildingDist.fullTargetSourceCount.toNumber() : targetBuildingDist.fullTargetSourceCount.toDecimalString()}</span>
+              {sourceBuildingType && <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={flatEdge.fromItemId} size="sm" />}
+              <span>+ 1 partial ({String(targetBuildingDist.partialTargetFraction.numerator)}/{String(targetBuildingDist.partialTargetFraction.denominator)})</span>
+              {targetBuildingType && <BuildingIcon buildingType={targetBuildingType as BuildingType} itemId={flatEdge.toItemId} size="sm" />}
+              <span>× {targetBuildingDist.partialTargetSourceCount.isInteger() ? targetBuildingDist.partialTargetSourceCount.toNumber() : targetBuildingDist.partialTargetSourceCount.toDecimalString()}</span>
+              {sourceBuildingType && <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={flatEdge.fromItemId} size="sm" />}
             </div>
           )}
         </>
@@ -326,11 +340,14 @@ export const BlueprintEdge = memo(function BlueprintEdge({
       <WiringDiagramSection
         distribution={distribution}
         targetDistribution={targetDistribution}
+        targetBuildingDist={targetBuildingDist}
         sourceBuildingType={sourceBuildingType}
         targetBuildingType={targetBuildingType}
+        sourceItemId={flatEdge.fromItemId}
+        targetItemId={flatEdge.toItemId}
         buildingShare={buildingShare}
         targetBuildingCount={targetBuildingCount}
-        beltsNeeded={beltsNeeded}
+        beltsNeeded={displayBelts}
         isDark={isDark}
         labelClass={labelClass}
         dividerClass={dividerClass}
@@ -419,7 +436,7 @@ export const BlueprintEdge = memo(function BlueprintEdge({
     </div>
   );
 
-  const tooltipParts = [`${beltsNeeded} belt${beltsNeeded > 1 ? 's' : ''}`, `${utilizationPct}%`];
+  const tooltipParts = [`${displayBelts} belt${displayBelts > 1 ? 's' : ''}`, `${utilizationPct}%`];
   if (shareText && sourceBuildingName) {
     tooltipParts.push(`${shareText} ${sourceIsRaw ? 'extractors' : sourceBuildingName.toLowerCase() + 's'}`);
   }
@@ -470,8 +487,8 @@ export const BlueprintEdge = memo(function BlueprintEdge({
               {rateText}
               {showBeltIndicator && (
                 <>
-                  <BeltIcon size={10} color={statusColor} />
-                  <span style={{ color: statusColor }}>{beltLabel}</span>
+                  <BeltIcon size={10} color={indicatorColor} />
+                  <span style={{ color: indicatorColor }}>{beltLabel}</span>
                 </>
               )}
             </span>
