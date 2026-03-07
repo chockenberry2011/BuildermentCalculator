@@ -883,6 +883,7 @@ export function BlueprintFlowView({ isFullscreen }: { isFullscreen?: boolean } =
     return (
       <MobileCardView
         dag={dag}
+        beltSpeed={beltSpeed}
         isDark={isDark}
         rootItemIds={rootItemIds}
         blueprintProgress={blueprintProgress}
