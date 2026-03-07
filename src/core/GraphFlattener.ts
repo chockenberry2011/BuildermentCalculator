@@ -425,6 +425,49 @@ function splitNonFriendlyNodes(
 }
 
 /**
+ * Compute topological ranks for each node in the DAG.
+ * Raw/leaf nodes get rank 0, others get max(input ranks) + 1.
+ * Useful for grouping nodes by production step.
+ */
+export function computeTopologicalRanks(dag: FlatDAG): Map<string, number> {
+  const inputsOf = new Map<string, string[]>();
+  for (const node of dag.nodes) {
+    inputsOf.set(node.nodeKey, []);
+  }
+  for (const edge of dag.edges) {
+    inputsOf.get(edge.toNodeKey)?.push(edge.fromNodeKey);
+  }
+
+  const ranks = new Map<string, number>();
+
+  function computeRank(nodeKey: string, visited: Set<string>): number {
+    if (ranks.has(nodeKey)) return ranks.get(nodeKey)!;
+    if (visited.has(nodeKey)) return 0;
+    visited.add(nodeKey);
+
+    const inputs = inputsOf.get(nodeKey) ?? [];
+    if (inputs.length === 0) {
+      ranks.set(nodeKey, 0);
+      return 0;
+    }
+
+    let maxInputRank = 0;
+    for (const inputKey of inputs) {
+      maxInputRank = Math.max(maxInputRank, computeRank(inputKey, visited));
+    }
+    const rank = maxInputRank + 1;
+    ranks.set(nodeKey, rank);
+    return rank;
+  }
+
+  for (const node of dag.nodes) {
+    computeRank(node.nodeKey, new Set());
+  }
+
+  return ranks;
+}
+
+/**
  * Compute layout positions for the DAG using topological ranking.
  * Raw resources on left (rank 0), final product on right (highest rank).
  * When orientation is 'vertical', x/y are swapped so flow goes top-to-bottom.

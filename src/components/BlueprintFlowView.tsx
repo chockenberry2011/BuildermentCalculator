@@ -20,6 +20,7 @@ import { flattenToDAG, layoutDAG, type FlatDAG, type FlatNode } from '../core/Gr
 import { BlueprintNode, type BlueprintNodeData, type NodeInputInfo } from './blueprint/BlueprintNode';
 import { BlueprintEdge, type BlueprintEdgeData } from './blueprint/BlueprintEdge';
 import { BlueprintSearch } from './blueprint/BlueprintSearch';
+import { MobileCardView } from './blueprint/MobileCardView';
 import { useZoomLevel } from '../hooks/useZoomLevel';
 import { getItemColor } from '../data/itemColors';
 import { BUILDINGS, getExtractorRates } from '../data/buildings';
@@ -779,8 +780,17 @@ export function BlueprintFlowView({ isFullscreen }: { isFullscreen?: boolean } =
   // Compute a structural key that changes when graph topology changes
   const prevStructureKeyRef = useRef<string>('');
 
+  // Compute DAG (needed for both mobile card view and desktop canvas)
+  const dag = useMemo(() => {
+    if (!productionResult) return null;
+    const d = flattenToDAG(productionResult, blueprintMergeMode, extractorRates);
+    d.nodes = d.nodes.filter((n) => n.nodeKey !== '__multi_root__');
+    return d;
+  }, [productionResult, blueprintMergeMode, extractorRates]);
+
+  // Compute ReactFlow data only on desktop (skip expensive layout on mobile)
   const { initialNodes, initialEdges, adjacency } = useMemo(() => {
-    if (!productionResult) {
+    if (!dag || isSmallScreen) {
       return {
         initialNodes: [] as Node[],
         initialEdges: [] as Edge[],
@@ -791,8 +801,6 @@ export function BlueprintFlowView({ isFullscreen }: { isFullscreen?: boolean } =
         } as AdjacencyMaps,
       };
     }
-    const dag = flattenToDAG(productionResult, blueprintMergeMode, extractorRates);
-    dag.nodes = dag.nodes.filter((n) => n.nodeKey !== '__multi_root__');
     const computedPositions = layoutDAG(dag, orientation);
     // Overlay user-saved position overrides on top of algorithmically computed positions
     const positions = new Map(computedPositions);
@@ -813,7 +821,7 @@ export function BlueprintFlowView({ isFullscreen }: { isFullscreen?: boolean } =
       toggleBlueprintProgress,
     );
     return { initialNodes: rfNodes, initialEdges: rfEdges, adjacency };
-  }, [productionResult, beltSpeed, isDark, targetItemId, rootItemIds, orientation, blueprintMergeMode, blueprintProgress, toggleBlueprintProgress, blueprintPositions, extractorRates]);
+  }, [dag, isSmallScreen, beltSpeed, isDark, targetItemId, rootItemIds, orientation, blueprintProgress, toggleBlueprintProgress, blueprintPositions]);
 
   // Structural key for detecting graph topology changes
   const structureKey = useMemo(() => {
@@ -859,7 +867,7 @@ export function BlueprintFlowView({ isFullscreen }: { isFullscreen?: boolean } =
     setSavedViewport(null); // reset viewport on mode change
   }, [blueprintMergeMode, setBlueprintMergeMode]);
 
-  if (!productionResult) {
+  if (!productionResult || !dag) {
     return (
       <div
         className={`h-[60vh] ${isDark ? 'bg-gray-800' : 'bg-gray-100'} rounded-lg flex items-center justify-center`}
@@ -868,6 +876,20 @@ export function BlueprintFlowView({ isFullscreen }: { isFullscreen?: boolean } =
           Select an item to see production blueprint
         </span>
       </div>
+    );
+  }
+
+  if (isSmallScreen) {
+    return (
+      <MobileCardView
+        dag={dag}
+        isDark={isDark}
+        rootItemIds={rootItemIds}
+        blueprintProgress={blueprintProgress}
+        toggleBlueprintProgress={toggleBlueprintProgress}
+        hasProgress={blueprintProgress.size > 0}
+        onClearProgress={clearBlueprintProgress}
+      />
     );
   }
 

@@ -21,7 +21,7 @@ interface TreeNodeProps {
 }
 
 function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCount, constraintSource, blueprintProgress, setBlueprintProgressState }: TreeNodeProps) {
-  const indent = depth * 16;
+  const indent = Math.min(depth * 16, 64);
 
   const buildingInfo = node.building;
   const buildingName = buildingInfo
