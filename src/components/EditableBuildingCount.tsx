@@ -62,7 +62,7 @@ export function EditableBuildingCount({ count, isConstraint, onSetCount, isDark 
         onBlur={handleConfirm}
         onKeyDown={handleKeyDown}
         style={{ color }}
-        className="w-14 h-5 px-0 text-center font-mono text-sm font-semibold bg-transparent border-none outline-none"
+        className="w-12 sm:w-14 h-5 px-0 text-center font-mono text-xs sm:text-sm font-semibold bg-transparent border-none outline-none"
         title="Edit to set as constraint"
         step="1"
         min="0"

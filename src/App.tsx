@@ -105,14 +105,17 @@ function AppContent() {
 
   useEffect(() => {
     const el = targetListRef.current;
-    if (!el) return;
+    if (!el) {
+      setShowStickyBar(false);
+      return;
+    }
     const observer = new IntersectionObserver(
       ([entry]) => setShowStickyBar(!entry.isIntersecting),
       { threshold: 0, rootMargin: '-60px 0px 0px 0px' },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [isFullscreen]);
 
   // Escape key exits fullscreen
   useEffect(() => {
@@ -196,7 +199,7 @@ function AppContent() {
       <main className={isFullscreen ? '' : 'py-4 sm:py-6'}>
         {/* Zone 1: Constrained top */}
         {!isFullscreen && (
-          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="max-w-6xl mx-auto px-3 sm:px-6">
             <div ref={targetListRef} className={`group/sticky ${isDark ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg p-2 sm:p-3 mb-4 sm:mb-6 shadow-sm`}>
               <TargetList />
             </div>
@@ -215,7 +218,7 @@ function AppContent() {
         <div className={
           isFullscreen
             ? `fixed inset-0 z-40 flex flex-col pt-10 ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`
-            : 'max-w-6xl mx-auto px-4 sm:px-6 mb-4 sm:mb-6'
+            : 'max-w-6xl mx-auto px-3 sm:px-6 mb-4 sm:mb-6'
         }>
           <CollapsibleSection
             title="Production View"
@@ -231,7 +234,7 @@ function AppContent() {
 
         {/* Zone 3: Constrained bottom */}
         {!isFullscreen && (
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-4 sm:space-y-6">
+          <div className="max-w-6xl mx-auto px-3 sm:px-6 space-y-4 sm:space-y-6">
             {productionResult && (
               <CollapsibleSection title="Raw Resources" subtitle="Total resources needed from the map" isOpen={!collapsedSections['Raw Resources']} onToggle={() => toggleSection('Raw Resources')}>
                 <SummaryTable />

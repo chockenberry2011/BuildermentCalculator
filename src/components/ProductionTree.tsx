@@ -55,7 +55,7 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
   return (
     <div className="font-mono text-xs sm:text-sm">
       <div
-        className={`flex items-center py-1 rounded px-2 cursor-pointer ${
+        className={`flex flex-wrap sm:flex-nowrap items-center py-1 rounded px-2 cursor-pointer ${
           nodeProgressState === 'completed'
             ? isDark
               ? 'bg-green-900/60 hover:bg-green-900/80'
@@ -86,7 +86,7 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
         }}
       >
         {/* Left side: connector + name + rate + dashed fill — fixed width so inputs align */}
-        <div className="flex items-center gap-2 w-[220px] sm:w-[280px] flex-shrink-0">
+        <div className="flex items-center gap-2 w-full sm:w-[280px] sm:flex-shrink-0">
           {depth > 0 && (
             <span className={isDark ? 'text-gray-600' : 'text-gray-400'}>
               {depth === 1 ? '├──' : '└──'}
@@ -108,7 +108,7 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
 
         {/* Right side: building info — aligned across siblings */}
         {buildingInfo && (
-          <div className="flex items-center gap-1.5 ml-2">
+          <div className="flex items-center gap-1.5 w-full sm:w-auto pl-6 sm:pl-0 ml-0 sm:ml-2">
             <EditableBuildingCount
               count={buildingInfo.count}
               isConstraint={isConstraint}
@@ -188,7 +188,7 @@ export function ProductionTree() {
   const isMultiRoot = productionResult.root.itemId === '__multi_root__';
 
   return (
-    <div>
+    <div className="overflow-x-auto">
       {isMultiRoot ? (
         // Multi-target: render each child as a separate section
         productionResult.root.children.map((child, i) => (
