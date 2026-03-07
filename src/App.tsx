@@ -168,7 +168,7 @@ function AppContent() {
   );
 
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    <div className={`min-h-screen overflow-x-hidden ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`}>
       <StickyTargetSummary visible={showStickyBar || isFullscreen} isDark={isDark} isFullscreen={isFullscreen} onExitFullscreen={() => setIsFullscreen(false)} />
 
       {/* Header */}

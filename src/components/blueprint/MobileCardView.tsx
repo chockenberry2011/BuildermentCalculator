@@ -198,7 +198,7 @@ export function MobileCardView({
   const labelColor = isDark ? 'text-gray-400' : 'text-gray-500';
 
   return (
-    <div className={`${bg} rounded-lg`}>
+    <div className={`${bg} rounded-lg w-full max-w-full overflow-x-hidden`}>
       {/* Sticky search bar */}
       <div className={`sticky top-0 z-10 ${bg} px-3 py-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
         <div className="flex gap-2 items-center">
