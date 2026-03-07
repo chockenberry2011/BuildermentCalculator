@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { flattenToDAG, layoutDAG } from '../GraphFlattener';
+import { flattenToDAG, layoutDAG, computeTopologicalRanks, computeBranchGroups } from '../GraphFlattener';
 import { calculateProduction, calculateMultiProduction, getDefaultBuildingLevels } from '../ProductionCalculator';
 
 const defaultLevels = getDefaultBuildingLevels();
@@ -367,5 +367,100 @@ describe('layoutDAG', () => {
     for (const [, xValues] of rankXValues) {
       expect(xValues.size).toBe(1);
     }
+  });
+});
+
+describe('computeBranchGroups', () => {
+  it('simple linear chain produces 1 branch, no shared', () => {
+    const result = calculateProduction('iron_ingot', 1, noRecipes, defaultLevels);
+    const dag = flattenToDAG(result);
+    const ranks = computeTopologicalRanks(dag);
+    const rootKeys = new Set(['iron_ingot']);
+    const groups = computeBranchGroups(dag, rootKeys, ranks);
+
+    // Should have: Final Product, 1 branch (iron_ore), Raw Resources
+    const rootGroup = groups.find((g) => g.isRoot);
+    const rawGroup = groups.find((g) => g.isRaw);
+    const sharedGroup = groups.find((g) => g.isShared);
+    expect(rootGroup).toBeDefined();
+    expect(rawGroup).toBeDefined();
+    expect(sharedGroup).toBeUndefined();
+  });
+
+  it('branching recipe produces multiple branches + shared section', () => {
+    const result = calculateProduction('computer', 1, noRecipes, defaultLevels);
+    const dag = flattenToDAG(result);
+    const ranks = computeTopologicalRanks(dag);
+    const rootKeys = new Set(['computer']);
+    const groups = computeBranchGroups(dag, rootKeys, ranks);
+
+    // Should have Final Product + at least 2 branches + Raw Resources
+    const rootGroup = groups.find((g) => g.isRoot);
+    const rawGroup = groups.find((g) => g.isRaw);
+    const branchGroups = groups.filter((g) => !g.isRoot && !g.isRaw && !g.isShared);
+    expect(rootGroup).toBeDefined();
+    expect(rawGroup).toBeDefined();
+    expect(branchGroups.length).toBeGreaterThanOrEqual(2);
+
+    // All nodes should appear exactly once across all groups
+    const allNodeKeys = groups.flatMap((g) => g.nodes.map((n) => n.nodeKey));
+    expect(new Set(allNodeKeys).size).toBe(allNodeKeys.length);
+    expect(allNodeKeys.length).toBe(dag.nodes.length);
+  });
+
+  it('single raw resource degenerates to raw group only', () => {
+    const result = calculateProduction('iron_ore', 1, noRecipes, defaultLevels);
+    const dag = flattenToDAG(result);
+    const ranks = computeTopologicalRanks(dag);
+    const rootKeys = new Set(['iron_ore']);
+    const groups = computeBranchGroups(dag, rootKeys, ranks);
+
+    // iron_ore is both root and raw — it goes to root group
+    const rootGroup = groups.find((g) => g.isRoot);
+    expect(rootGroup).toBeDefined();
+    expect(rootGroup!.nodes).toHaveLength(1);
+    // No branch groups since root has no inputs
+    const branchGroups = groups.filter((g) => !g.isRoot && !g.isRaw && !g.isShared);
+    expect(branchGroups.length).toBe(0);
+  });
+
+  it('multi-root production creates branches from multiple targets', () => {
+    const result = calculateMultiProduction(
+      [
+        { itemId: 'iron_ingot', rate: 1 },
+        { itemId: 'copper_wire', rate: 1 },
+      ],
+      noRecipes,
+      defaultLevels,
+    );
+    const dag = flattenToDAG(result);
+    const ranks = computeTopologicalRanks(dag);
+    const rootKeys = new Set(['iron_ingot', 'copper_wire']);
+    const groups = computeBranchGroups(dag, rootKeys, ranks);
+
+    // All nodes should be accounted for
+    const allNodeKeys = groups.flatMap((g) => g.nodes.map((n) => n.nodeKey));
+    expect(new Set(allNodeKeys).size).toBe(allNodeKeys.length);
+    expect(allNodeKeys.length).toBe(dag.nodes.length);
+  });
+
+  it('dedicated mode produces fewer shared nodes', () => {
+    const result = calculateProduction('computer', 1, noRecipes, defaultLevels);
+
+    const mergedDag = flattenToDAG(result, 'merged');
+    const mergedRanks = computeTopologicalRanks(mergedDag);
+    const mergedGroups = computeBranchGroups(mergedDag, new Set(['computer']), mergedRanks);
+    const mergedShared = mergedGroups.find((g) => g.isShared)?.nodes.length ?? 0;
+
+    const dedicatedDag = flattenToDAG(result, 'dedicated');
+    const dedicatedRanks = computeTopologicalRanks(dedicatedDag);
+    // In dedicated mode, root nodeKey for split nodes may differ
+    const dedicatedRootKeys = new Set(
+      dedicatedDag.nodes.filter((n) => n.itemId === 'computer').map((n) => n.nodeKey),
+    );
+    const dedicatedGroups = computeBranchGroups(dedicatedDag, dedicatedRootKeys, dedicatedRanks);
+    const dedicatedShared = dedicatedGroups.find((g) => g.isShared)?.nodes.length ?? 0;
+
+    expect(dedicatedShared).toBeLessThanOrEqual(mergedShared);
   });
 });

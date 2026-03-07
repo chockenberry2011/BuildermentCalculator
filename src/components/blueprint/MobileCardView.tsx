@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { type FlatDAG, type FlatNode, type FlatEdge, computeTopologicalRanks } from '../../core/GraphFlattener';
+import { type FlatDAG, type FlatNode, type FlatEdge, computeTopologicalRanks, computeBranchGroups } from '../../core/GraphFlattener';
 import type { BlueprintProgressState } from '../../store/useStore';
 import { BUILDINGS } from '../../data/buildings';
 import { getItemColor } from '../../data/itemColors';
@@ -567,6 +567,7 @@ export function MobileCardView({
   onClearProgress,
 }: MobileCardViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [groupMode, setGroupMode] = useState<'steps' | 'branches'>('steps');
 
   const ranks = useMemo(() => computeTopologicalRanks(dag), [dag]);
 
@@ -583,7 +584,7 @@ export function MobileCardView({
 
   // Group nodes by rank (descending: final products first)
   const groupedNodes = useMemo(() => {
-    const groups: { rank: number; label: string; nodes: FlatNode[] }[] = [];
+    const groups: { rank: number; label: string; nodes: FlatNode[]; accentColor?: string }[] = [];
     const byRank = new Map<number, FlatNode[]>();
     for (const node of dag.nodes) {
       const rank = ranks.get(node.nodeKey) ?? 0;
@@ -601,17 +602,42 @@ export function MobileCardView({
     return groups;
   }, [dag.nodes, ranks, maxRank]);
 
+  // Branch-based grouping
+  const branchGroups = useMemo(() => {
+    if (groupMode !== 'branches') return null;
+    return computeBranchGroups(dag, rootItemIds, ranks);
+  }, [dag, rootItemIds, ranks, groupMode]);
+
+  // Unified group type for rendering
+  type RenderGroup = { key: string; label: string; nodes: FlatNode[]; accentColor?: string };
+
+  const renderGroups: RenderGroup[] = useMemo(() => {
+    if (groupMode === 'branches' && branchGroups) {
+      return branchGroups.map((bg) => ({
+        key: bg.id,
+        label: bg.name,
+        nodes: bg.nodes,
+        accentColor: bg.isShared || bg.isRaw || bg.isRoot ? undefined : bg.accentColor,
+      }));
+    }
+    return groupedNodes.map((g) => ({
+      key: String(g.rank),
+      label: g.label,
+      nodes: g.nodes,
+    }));
+  }, [groupMode, branchGroups, groupedNodes]);
+
   // Filter by search
   const filteredGroups = useMemo(() => {
-    if (!searchQuery.trim()) return groupedNodes;
+    if (!searchQuery.trim()) return renderGroups;
     const q = searchQuery.toLowerCase();
-    return groupedNodes
+    return renderGroups
       .map((group) => ({
         ...group,
         nodes: group.nodes.filter((n) => n.itemName.toLowerCase().includes(q)),
       }))
       .filter((group) => group.nodes.length > 0);
-  }, [groupedNodes, searchQuery]);
+  }, [renderGroups, searchQuery]);
 
   const bg = isDark ? 'bg-gray-900' : 'bg-gray-50';
   const inputBg = isDark ? 'bg-gray-800 border-gray-600 text-gray-100 placeholder-gray-500' : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400';
@@ -619,7 +645,7 @@ export function MobileCardView({
 
   return (
     <div className={`${bg} rounded-lg w-full max-w-full overflow-x-hidden`}>
-      {/* Sticky search bar */}
+      {/* Sticky search bar + group toggle */}
       <div className={`sticky top-0 z-10 ${bg} px-3 py-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
         <div className="flex gap-2 items-center">
           <input
@@ -629,6 +655,29 @@ export function MobileCardView({
             placeholder="Search items..."
             className={`flex-1 text-sm rounded-md border px-2.5 py-1.5 ${inputBg} outline-none focus:ring-1 focus:ring-blue-500`}
           />
+          {/* Steps / Branches toggle */}
+          <div className={`flex rounded-md border text-xs font-medium shrink-0 ${isDark ? 'border-gray-600' : 'border-gray-300'}`}>
+            <button
+              onClick={() => setGroupMode('steps')}
+              className={`px-2 py-1.5 rounded-l-md transition-colors ${
+                groupMode === 'steps'
+                  ? (isDark ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white')
+                  : (isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700')
+              }`}
+            >
+              Steps
+            </button>
+            <button
+              onClick={() => setGroupMode('branches')}
+              className={`px-2 py-1.5 rounded-r-md transition-colors ${
+                groupMode === 'branches'
+                  ? (isDark ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white')
+                  : (isDark ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700')
+              }`}
+            >
+              Branches
+            </button>
+          </div>
           {hasProgress && (
             <button
               onClick={onClearProgress}
@@ -643,11 +692,22 @@ export function MobileCardView({
       {/* Card list */}
       <div className="px-3 py-2 space-y-4">
         {filteredGroups.map((group) => (
-          <div key={group.rank}>
-            <div className={`text-xs font-semibold uppercase tracking-wider ${labelColor} mb-2`}>
-              {group.label}
+          <div key={group.key}>
+            <div className="flex items-center gap-2 mb-2">
+              {group.accentColor && (
+                <span
+                  className="shrink-0 rounded-full"
+                  style={{ width: 10, height: 10, backgroundColor: group.accentColor }}
+                />
+              )}
+              <div className={`text-xs font-semibold uppercase tracking-wider ${labelColor}`}>
+                {group.label}
+              </div>
             </div>
-            <div className="space-y-2">
+            <div
+              className="space-y-2"
+              style={group.accentColor ? { borderLeft: `3px solid ${group.accentColor}`, paddingLeft: 8 } : undefined}
+            >
               {group.nodes.map((node) => (
                 <MobileCard
                   key={node.nodeKey}

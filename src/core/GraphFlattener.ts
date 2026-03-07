@@ -3,6 +3,7 @@ import { Recipe } from '../data/recipes';
 import { EXTRACTOR_RATES } from '../data/buildings';
 import { Rational } from './math/rational';
 import { gcdMultiple, isSplitterFriendlyRatio, isSimpleSplitterRatio } from './math/gcd';
+import { getItemColor } from '../data/itemColors';
 
 export interface FlatNode {
   nodeKey: string;              // unique DAG identity (itemId for merged, "{itemId}_for_{consumerItemId}" for split)
@@ -730,4 +731,204 @@ export function layoutDAG(dag: FlatDAG, orientation: LayoutOrientation = 'horizo
   }
 
   return positions;
+}
+
+export interface BranchGroup {
+  id: string;           // branch seed nodeKey, or '__shared__', '__raw__', '__root__'
+  name: string;         // display name
+  accentColor: string;  // from getItemColor()
+  nodes: FlatNode[];    // ordered by descending rank
+  isShared: boolean;
+  isRaw: boolean;
+  isRoot: boolean;
+}
+
+/**
+ * Group DAG nodes by production branch.
+ * Each direct input of a root node seeds a branch; nodes reachable from
+ * exactly one branch belong to it, nodes reachable from multiple go to "Shared",
+ * raw resources go to "Raw Resources", and root nodes go to "Final Product".
+ */
+export function computeBranchGroups(
+  dag: FlatDAG,
+  rootNodeKeys: Set<string>,
+  ranks: Map<string, number>,
+): BranchGroup[] {
+  // Build reverse adjacency: for each node, which nodes feed into it
+  const inputsOf = new Map<string, string[]>();
+  for (const node of dag.nodes) {
+    inputsOf.set(node.nodeKey, []);
+  }
+  for (const edge of dag.edges) {
+    inputsOf.get(edge.toNodeKey)?.push(edge.fromNodeKey);
+  }
+
+  // Build forward adjacency: for each node, which nodes consume it
+  const outputsOf = new Map<string, string[]>();
+  for (const node of dag.nodes) {
+    outputsOf.set(node.nodeKey, []);
+  }
+  for (const edge of dag.edges) {
+    outputsOf.get(edge.fromNodeKey)?.push(edge.toNodeKey);
+  }
+
+  // Find branch seeds: direct inputs of root nodes
+  const branchSeeds: string[] = [];
+  const branchSeedSet = new Set<string>();
+  for (const rootKey of rootNodeKeys) {
+    const inputs = inputsOf.get(rootKey) ?? [];
+    for (const inputKey of inputs) {
+      if (!branchSeedSet.has(inputKey)) {
+        branchSeedSet.add(inputKey);
+        branchSeeds.push(inputKey);
+      }
+    }
+  }
+
+  // For each branch seed, BFS backward to collect all ancestor nodes
+  const branchReachable = new Map<string, Set<string>>(); // branchSeedKey -> set of reachable nodeKeys
+  for (const seedKey of branchSeeds) {
+    const reachable = new Set<string>();
+    const queue = [seedKey];
+    while (queue.length > 0) {
+      const current = queue.pop()!;
+      if (reachable.has(current)) continue;
+      if (rootNodeKeys.has(current)) continue; // don't cross into root nodes
+      reachable.add(current);
+      const inputs = inputsOf.get(current) ?? [];
+      for (const inputKey of inputs) {
+        if (!reachable.has(inputKey)) {
+          queue.push(inputKey);
+        }
+      }
+    }
+    branchReachable.set(seedKey, reachable);
+  }
+
+  // Classify each non-root node
+  const nodeMap = new Map<string, FlatNode>();
+  for (const node of dag.nodes) {
+    nodeMap.set(node.nodeKey, node);
+  }
+
+  const rootGroup: FlatNode[] = [];
+  const rawGroup: FlatNode[] = [];
+  const branchNodes = new Map<string, FlatNode[]>(); // branchSeedKey -> nodes
+  const sharedNodes: FlatNode[] = [];
+  // Track which branches consume each shared node (for accent dots)
+  const sharedNodeBranches = new Map<string, string[]>();
+
+  for (const seedKey of branchSeeds) {
+    branchNodes.set(seedKey, []);
+  }
+
+  for (const node of dag.nodes) {
+    if (rootNodeKeys.has(node.nodeKey)) {
+      rootGroup.push(node);
+      continue;
+    }
+    if (node.isRaw) {
+      rawGroup.push(node);
+      continue;
+    }
+
+    // Which branches can reach this node?
+    const reachingBranches: string[] = [];
+    for (const seedKey of branchSeeds) {
+      if (branchReachable.get(seedKey)!.has(node.nodeKey)) {
+        reachingBranches.push(seedKey);
+      }
+    }
+
+    if (reachingBranches.length === 1) {
+      branchNodes.get(reachingBranches[0])!.push(node);
+    } else if (reachingBranches.length > 1) {
+      sharedNodes.push(node);
+      sharedNodeBranches.set(node.nodeKey, reachingBranches);
+    } else {
+      // Not reachable from any branch (shouldn't happen in a well-formed DAG)
+      // Put in shared as fallback
+      sharedNodes.push(node);
+    }
+  }
+
+  // Sort helper: descending rank within each group
+  const sortByRankDesc = (a: FlatNode, b: FlatNode) => {
+    const ra = ranks.get(a.nodeKey) ?? 0;
+    const rb = ranks.get(b.nodeKey) ?? 0;
+    if (rb !== ra) return rb - ra;
+    return a.itemName.localeCompare(b.itemName);
+  };
+
+  // Build result groups
+  const groups: BranchGroup[] = [];
+
+  // Final Product
+  if (rootGroup.length > 0) {
+    rootGroup.sort(sortByRankDesc);
+    groups.push({
+      id: '__root__',
+      name: 'Final Product',
+      accentColor: rootGroup.length === 1 ? getItemColor(rootGroup[0].itemId) : '#6B7280',
+      nodes: rootGroup,
+      isShared: false,
+      isRaw: false,
+      isRoot: true,
+    });
+  }
+
+  // Sort branches by complexity (most nodes first), then alphabetical
+  const sortedBranchSeeds = [...branchSeeds].sort((a, b) => {
+    const countA = branchNodes.get(a)!.length;
+    const countB = branchNodes.get(b)!.length;
+    if (countB !== countA) return countB - countA;
+    const nameA = nodeMap.get(a)?.itemName ?? a;
+    const nameB = nodeMap.get(b)?.itemName ?? b;
+    return nameA.localeCompare(nameB);
+  });
+
+  for (const seedKey of sortedBranchSeeds) {
+    const nodes = branchNodes.get(seedKey)!;
+    nodes.sort(sortByRankDesc);
+    const seedNode = nodeMap.get(seedKey);
+    groups.push({
+      id: seedKey,
+      name: seedNode?.itemName ?? seedKey,
+      accentColor: getItemColor(seedNode?.itemId ?? seedKey),
+      nodes,
+      isShared: false,
+      isRaw: false,
+      isRoot: false,
+    });
+  }
+
+  // Shared
+  if (sharedNodes.length > 0) {
+    sharedNodes.sort(sortByRankDesc);
+    groups.push({
+      id: '__shared__',
+      name: 'Shared',
+      accentColor: '#6B7280',
+      nodes: sharedNodes,
+      isShared: true,
+      isRaw: false,
+      isRoot: false,
+    });
+  }
+
+  // Raw Resources
+  if (rawGroup.length > 0) {
+    rawGroup.sort(sortByRankDesc);
+    groups.push({
+      id: '__raw__',
+      name: 'Raw Resources',
+      accentColor: '#6B7280',
+      nodes: rawGroup,
+      isShared: false,
+      isRaw: true,
+      isRoot: false,
+    });
+  }
+
+  return groups;
 }
