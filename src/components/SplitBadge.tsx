@@ -1,6 +1,7 @@
 import { Rational } from '../core/math/rational';
 import { getSplitInfo } from '../core/splitInfo';
 import { fractionSimplicityScore } from '../core/RatioOptimizer';
+import { isPowerOf2 } from '../core/math/gcd';
 import { getQualityLabel, getCountColor } from '../core/countColor';
 import { BadgePopover } from './BadgePopover';
 
@@ -100,6 +101,23 @@ export function SplitBadge({ count, variant = 'pill', isDark = false, autoRegula
       <div className="flex justify-between items-center">
         <span className={labelClass}>Simplicity</span>
         <span className="font-medium" style={{ color: qualityColor }}>{qualityLabel}</span>
+      </div>
+      <div className={`border-t my-2 ${dividerClass}`} />
+      <div className={`text-xs ${labelClass}`}>
+        <div className="flex items-center gap-1 mb-1">
+          <SplitIcon size={10} color="currentColor" />
+          <span className="font-medium">Use a 1:{info.splitDenominator} splitter</span>
+        </div>
+        {info.splitNumerator > 1 && (
+          <div className="italic">
+            Route {info.splitNumerator} of {info.splitDenominator} outputs to partial building
+          </div>
+        )}
+        {isPowerOf2(info.splitDenominator) && info.splitDenominator > 2 && (
+          <div className="italic">
+            Cascade {Math.log2(info.splitDenominator)} stages of 1:2 splitters
+          </div>
+        )}
       </div>
       {autoRegulated && (
         <>

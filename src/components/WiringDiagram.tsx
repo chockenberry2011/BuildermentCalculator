@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { computeWiringLayout, getCompressedInfo } from '../core/wiringLayout';
+import { gcd, isPowerOf2 } from '../core/math/gcd';
 import { BUILDING_COLORS, BuildingIcon } from './BuildingIcon';
 import type { BeltDistribution, TargetBuildingDistribution } from '../core/beltDistribution';
 import { computeFeedingPattern } from '../core/beltDistribution';
@@ -170,6 +171,21 @@ function FeedingPatternSection({
   ) : null;
   const { dedicatedPerTarget, sharedSources, targetPerGroup, groupCount, remainingTargets, hasPartial, partialTargetFraction, partialSourceCount } = pattern;
 
+  // Splitter tip for a given numerator/denominator fraction
+  const renderSplitterTip = (numer: number, denom: number) => {
+    const g = gcd(numer, denom);
+    const n = numer / g;
+    const d = denom / g;
+    if (d <= 1) return null;
+    return (
+      <div className={`${labelClass} italic pl-2 mt-0.5`}>
+        Use a 1:{d} splitter
+        {n > 1 && ` · route ${n} of ${d} outputs`}
+        {isPowerOf2(d) && d > 2 && ` · ${Math.log2(d)}× cascade`}
+      </div>
+    );
+  };
+
   // Generate target labels: F1, F2, ... using first letter of target building type
   const targetInitial = targetBuildingType ? targetBuildingType.charAt(0).toUpperCase() : 'T';
 
@@ -225,6 +241,8 @@ function FeedingPatternSection({
           </div>
         );
       }
+      const tip = renderSplitterTip(1, targetPerGroup);
+      if (tip) lines.push(<div key={`tip-${labels[0]}`}>{tip}</div>);
     }
 
     return lines;
@@ -290,6 +308,7 @@ function FeedingPatternSection({
                 <span className={labelClass}>partial capacity</span>
               </div>
             ))}
+            {fractionalPerTarget > 0 && renderSplitterTip(sharedSources, pattern.targetPerGroup)}
             <div className={`${labelClass} pl-2 flex items-center gap-1`}>
               <span>({remSourceCount}</span>
               {srcIcon}
@@ -305,12 +324,17 @@ function FeedingPatternSection({
         const srcCount = partialSourceCount.isInteger()
           ? partialSourceCount.toNumber()
           : partialSourceCount.toDecimalString();
+        const denom = Number(partialTargetFraction.denominator);
+        const numer = Number(partialTargetFraction.numerator);
         return (
-          <div className="flex items-center gap-1 flex-wrap">
-            <span className={labelClass}>Partial {partialLabel} at {String(partialTargetFraction.numerator)}/{String(partialTargetFraction.denominator)}:</span>
-            <span>{srcCount}</span>
-            {srcIcon}
-          </div>
+          <>
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className={labelClass}>Partial {partialLabel} at {String(partialTargetFraction.numerator)}/{String(partialTargetFraction.denominator)}:</span>
+              <span>{srcCount}</span>
+              {srcIcon}
+            </div>
+            {renderSplitterTip(numer, denom)}
+          </>
         );
       })()}
     </div>
