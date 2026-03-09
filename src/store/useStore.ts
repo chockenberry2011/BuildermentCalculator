@@ -26,6 +26,7 @@ export type OptimizationDetailLevel = 'minimal' | 'standard' | 'full';
 export type BlueprintOrientation = 'horizontal' | 'vertical';
 export type BlueprintMergeMode = 'merged' | 'hybrid' | 'dedicated';
 export type BlueprintProgressState = 'in_progress' | 'completed';
+export type BlueprintGroupMode = 'steps' | 'branches';
 
 // Feature 2: Fractional building fix suggestions
 export interface ScalingSuggestion {
@@ -110,6 +111,9 @@ interface CalculatorState {
   // Blueprint node position overrides (nodeKey → {x, y})
   blueprintPositions: Map<string, { x: number; y: number }>;
 
+  // Blueprint mobile card group mode
+  blueprintGroupMode: BlueprintGroupMode;
+
   // Feature 4: Auto-integer mode
   autoIntegerMode: boolean;
 
@@ -159,6 +163,7 @@ interface CalculatorState {
   clearBlueprintProgress: () => void;
   setBlueprintPosition: (nodeKey: string, position: { x: number; y: number }) => void;
   clearBlueprintPositions: () => void;
+  setBlueprintGroupMode: (mode: BlueprintGroupMode) => void;
   resetCalculator: () => void;
   toggleSection: (sectionId: string) => void;
   addTarget: () => void;
@@ -216,6 +221,7 @@ export const useStore = create<CalculatorState>()(
       collapsedSections: {},
       blueprintProgress: new Map(),
       blueprintPositions: new Map(),
+      blueprintGroupMode: 'steps' as BlueprintGroupMode,
       autoIntegerMode: false,
       fractionalProposals: [],
       resourceConstraints: [],
@@ -488,6 +494,10 @@ export const useStore = create<CalculatorState>()(
         set({ blueprintPositions: new Map() });
       },
 
+      setBlueprintGroupMode: (mode) => {
+        set({ blueprintGroupMode: mode });
+      },
+
       resetCalculator: () => {
         set({
           targetItemId: 'wood_plank',
@@ -669,6 +679,7 @@ export const useStore = create<CalculatorState>()(
         worldGen2: state.worldGen2,
         resourceConstraints: state.resourceConstraints,
         collapsedSections: state.collapsedSections,
+        blueprintGroupMode: state.blueprintGroupMode,
         blueprintProgress: mapToObject(state.blueprintProgress),
         blueprintPositions: mapToObject(state.blueprintPositions),
       }),

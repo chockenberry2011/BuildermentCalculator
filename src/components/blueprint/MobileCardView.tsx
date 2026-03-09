@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { type FlatDAG, type FlatNode, type FlatEdge, computeTopologicalRanks, computeBranchGroups } from '../../core/GraphFlattener';
 import type { BlueprintProgressState } from '../../store/useStore';
+import { useStore } from '../../store/useStore';
 import { BUILDINGS } from '../../data/buildings';
 import { getItemColor } from '../../data/itemColors';
 import { fractionSimplicityScore } from '../../core/RatioOptimizer';
@@ -51,6 +52,7 @@ interface EdgeDetail {
   targetBuildingDist: TargetBuildingDistribution | null;
   physicalBeltInfo: PhysicalBeltInfo | null;
   splitterTree: SplitterTreeInfo | null;
+  sourceBuildingLevel: number | null;
 }
 
 function computeEdgeDetails(dag: FlatDAG, beltSpeed: number): Map<string, EdgeDetail[]> {
@@ -124,6 +126,7 @@ function computeEdgeDetails(dag: FlatDAG, beltSpeed: number): Map<string, EdgeDe
       targetBuildingDist,
       physicalBeltInfo,
       splitterTree: splitterTrees.get(edge.fromNodeKey) ?? null,
+      sourceBuildingLevel: srcBuilding?.level ?? null,
     };
 
     const list = result.get(edge.toNodeKey) ?? [];
@@ -200,6 +203,11 @@ function InputDetailPanel({ detail, isDark }: { detail: EdgeDetail; isDark: bool
               {shareText} of {detail.sourceBuildingCount
                 ? (detail.sourceBuildingCount.isInteger() ? Math.round(detail.sourceBuildingCount.toNumber()).toString() : detail.sourceBuildingCount.toNumber().toFixed(2))
                 : '?'}
+              {sourceIsRaw && detail.sourceBuildingLevel !== null && detail.sourceBuildingLevel > 1 && (
+                <span className={`text-[10px] font-medium px-1 py-0.5 rounded ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                  Lv{detail.sourceBuildingLevel}
+                </span>
+              )}
             </span>
           </div>
         </>
@@ -259,6 +267,23 @@ function InputDetailPanel({ detail, isDark }: { detail: EdgeDetail; isDark: bool
               {targetBuildingType && <BuildingIcon buildingType={targetBuildingType as BuildingType} itemId={edge.toItemId} size="sm" />}
               <span>&times; {targetBuildingDist.partialTargetSourceCount.isInteger() ? targetBuildingDist.partialTargetSourceCount.toNumber() : targetBuildingDist.partialTargetSourceCount.toDecimalString()}</span>
               {sourceBuildingType && <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={detail.sourceItemId} size="sm" />}
+            </div>
+          )}
+        </>
+      )}
+      {targetBuildingDist && targetDistribution && (
+        <>
+          <div className={`border-t my-1.5 ${dividerClass}`} />
+          <div className={`${labelClass} text-[11px]`}>Collection per belt</div>
+          <div className="font-medium flex items-center gap-1">
+            {targetBuildingType && (
+              <BuildingIcon buildingType={targetBuildingType as BuildingType} itemId={edge.toItemId} size="sm" />
+            )}
+            {targetDistribution.shortLabel}
+          </div>
+          {targetDistribution.splitInfo && (
+            <div className={`${labelClass} text-[11px] ml-5`}>
+              {targetDistribution.splitInfo.fullBuildings} full + {targetDistribution.splitInfo.splitNumerator}/{targetDistribution.splitInfo.splitDenominator} split
             </div>
           )}
         </>
@@ -519,8 +544,12 @@ function MobileCard({
             </span>
             <span className={`text-xs ${subtextColor}`}>
               {buildingName}
-              {building && building.level > 1 ? ` Lv${building.level}` : ''}
             </span>
+            {building && building.level > 1 && (
+              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                Lv{building.level}
+              </span>
+            )}
             <div className="flex-1" />
             {!count.isInteger && (
               <SplitBadge count={building!.count} isDark={isDark} />
@@ -567,7 +596,8 @@ export function MobileCardView({
   onClearProgress,
 }: MobileCardViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [groupMode, setGroupMode] = useState<'steps' | 'branches'>('steps');
+  const groupMode = useStore(s => s.blueprintGroupMode);
+  const setBlueprintGroupMode = useStore(s => s.setBlueprintGroupMode);
 
   const ranks = useMemo(() => computeTopologicalRanks(dag), [dag]);
 
@@ -647,18 +677,18 @@ export function MobileCardView({
     <div className={`${bg} rounded-lg w-full max-w-full overflow-x-hidden`}>
       {/* Sticky search bar + group toggle */}
       <div className={`sticky top-0 z-10 ${bg} px-3 py-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center min-w-0">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search items..."
-            className={`flex-1 text-sm rounded-md border px-2.5 py-1.5 ${inputBg} outline-none focus:ring-1 focus:ring-blue-500`}
+            className={`min-w-0 flex-1 max-w-[120px] text-sm rounded-md border px-2.5 py-1.5 ${inputBg} outline-none focus:ring-1 focus:ring-blue-500`}
           />
           {/* Steps / Branches toggle */}
           <div className={`flex rounded-md border text-xs font-medium shrink-0 ${isDark ? 'border-gray-600' : 'border-gray-300'}`}>
             <button
-              onClick={() => setGroupMode('steps')}
+              onClick={() => setBlueprintGroupMode('steps')}
               className={`px-2 py-1.5 rounded-l-md transition-colors ${
                 groupMode === 'steps'
                   ? (isDark ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white')
@@ -668,7 +698,7 @@ export function MobileCardView({
               Steps
             </button>
             <button
-              onClick={() => setGroupMode('branches')}
+              onClick={() => setBlueprintGroupMode('branches')}
               className={`px-2 py-1.5 rounded-r-md transition-colors ${
                 groupMode === 'branches'
                   ? (isDark ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white')
@@ -710,7 +740,7 @@ export function MobileCardView({
             >
               {group.nodes.map((node) => (
                 <MobileCard
-                  key={node.nodeKey}
+                  key={`${group.key}:${node.nodeKey}`}
                   node={node}
                   edgeDetails={edgeDetailsOf.get(node.nodeKey) ?? []}
                   isDark={isDark}

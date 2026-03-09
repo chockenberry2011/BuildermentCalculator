@@ -308,6 +308,23 @@ export const BlueprintEdge = memo(function BlueprintEdge({
           )}
         </>
       )}
+      {targetBuildingDist && targetDistribution && (
+        <>
+          <div className={`border-t my-2 ${dividerClass}`} />
+          <div className={`${labelClass} mb-1`}>Collection per belt</div>
+          <div className="font-medium flex items-center gap-1">
+            {targetBuildingType && (
+              <BuildingIcon buildingType={targetBuildingType as BuildingType} itemId={flatEdge.toItemId} size="sm" />
+            )}
+            {targetDistribution.shortLabel}
+          </div>
+          {targetDistribution.splitInfo && (
+            <div className={`${labelClass} text-[11px] ml-5`}>
+              {targetDistribution.splitInfo.fullBuildings} full + {targetDistribution.splitInfo.splitNumerator}/{targetDistribution.splitInfo.splitDenominator} split
+            </div>
+          )}
+        </>
+      )}
       {!targetBuildingDist && (distribution || targetDistribution) && (
         <>
           <div className={`border-t my-2 ${dividerClass}`} />

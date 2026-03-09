@@ -43,45 +43,18 @@ export function WiringDiagramSection({
   const [shown, setShown] = useState<DiagramSide | null>(null);
   const [feedingShown, setFeedingShown] = useState(false);
 
-  // Feeding pattern takes priority when we have target building distribution
-  if (targetBuildingDist) {
-    const pattern = computeFeedingPattern(targetBuildingDist);
-    const isFractionalRatio = !targetBuildingDist.buildingsPerTarget.isInteger();
+  // Feeding pattern when we have target building distribution
+  const hasFeedingPattern = !!targetBuildingDist;
+  const feedingPattern = targetBuildingDist ? computeFeedingPattern(targetBuildingDist) : null;
+  const isFractionalRatio = targetBuildingDist ? !targetBuildingDist.buildingsPerTarget.isInteger() : false;
+  const showFeeding = hasFeedingPattern && feedingPattern && (isFractionalRatio || feedingPattern.hasPartial);
 
-    // For integer ratios with no partial, the wiring is trivial — skip
-    if (!isFractionalRatio && !pattern.hasPartial) return null;
-
-    return (
-      <>
-        <div className={`border-t my-2 ${dividerClass}`} />
-        <button
-          type="button"
-          className={`${labelClass} text-[11px] hover:underline flex items-center gap-0.5`}
-          onClick={() => setFeedingShown(prev => !prev)}
-        >
-          <span className="text-[9px]">{feedingShown ? '▼' : '▶'}</span>
-          Wiring pattern
-        </button>
-        {feedingShown && (
-          <FeedingPatternSection
-            pattern={pattern}
-            isFractionalRatio={isFractionalRatio}
-            sourceBuildingType={sourceBuildingType}
-            targetBuildingType={targetBuildingType}
-            sourceItemId={sourceItemId}
-            targetItemId={targetItemId}
-            labelClass={labelClass}
-          />
-        )}
-      </>
-    );
-  }
-
-  // Fall back to belt-based wiring diagrams
+  // Belt-based wiring diagrams
   const sourceHasSplit = distribution?.splitInfo != null;
   const targetHasSplit = targetDistribution?.splitInfo != null;
+  const showBeltWiring = sourceHasSplit || targetHasSplit;
 
-  if (!sourceHasSplit && !targetHasSplit) return null;
+  if (!showFeeding && !showBeltWiring) return null;
 
   const hasBoth = sourceHasSplit && targetHasSplit;
 
@@ -93,56 +66,84 @@ export function WiringDiagramSection({
 
   return (
     <>
-      <div className={`border-t my-2 ${dividerClass}`} />
-      <div className="flex items-center gap-2">
-        {hasBoth ? (
-          <>
-            <button
-              type="button"
-              className={`${labelClass} text-[11px] hover:underline flex items-center gap-0.5`}
-              onClick={() => toggle('source')}
-            >
-              <span className="text-[9px]">{shown === 'source' ? '▼' : '▶'}</span>
-              Source wiring
-            </button>
-            <span className={labelClass}>·</span>
-            <button
-              type="button"
-              className={`${labelClass} text-[11px] hover:underline flex items-center gap-0.5`}
-              onClick={() => toggle('target')}
-            >
-              <span className="text-[9px]">{shown === 'target' ? '▼' : '▶'}</span>
-              Target wiring
-            </button>
-          </>
-        ) : (
+      {showFeeding && feedingPattern && (
+        <>
+          <div className={`border-t my-2 ${dividerClass}`} />
           <button
             type="button"
             className={`${labelClass} text-[11px] hover:underline flex items-center gap-0.5`}
-            onClick={() => toggle(singleSide)}
+            onClick={() => setFeedingShown(prev => !prev)}
           >
-            <span className="text-[9px]">{shown === singleSide ? '▼' : '▶'}</span>
-            Show wiring
+            <span className="text-[9px]">{feedingShown ? '▼' : '▶'}</span>
+            Wiring pattern
           </button>
-        )}
-      </div>
-      {shown === 'source' && sourceHasSplit && buildingShare && (
-        <WiringDiagram
-          splitInfo={distribution!.splitInfo!}
-          totalBuildings={Math.ceil(buildingShare.toNumber())}
-          beltsNeeded={beltsNeeded}
-          buildingType={sourceBuildingType}
-          isDark={isDark}
-        />
+          {feedingShown && (
+            <FeedingPatternSection
+              pattern={feedingPattern}
+              isFractionalRatio={isFractionalRatio}
+              sourceBuildingType={sourceBuildingType}
+              targetBuildingType={targetBuildingType}
+              sourceItemId={sourceItemId}
+              targetItemId={targetItemId}
+              labelClass={labelClass}
+            />
+          )}
+        </>
       )}
-      {shown === 'target' && targetHasSplit && targetBuildingCount && (
-        <WiringDiagram
-          splitInfo={targetDistribution!.splitInfo!}
-          totalBuildings={Math.ceil(targetBuildingCount.toNumber())}
-          beltsNeeded={beltsNeeded}
-          buildingType={targetBuildingType}
-          isDark={isDark}
-        />
+      {showBeltWiring && (
+        <>
+          <div className={`border-t my-2 ${dividerClass}`} />
+          <div className="flex items-center gap-2">
+            {hasBoth ? (
+              <>
+                <button
+                  type="button"
+                  className={`${labelClass} text-[11px] hover:underline flex items-center gap-0.5`}
+                  onClick={() => toggle('source')}
+                >
+                  <span className="text-[9px]">{shown === 'source' ? '▼' : '▶'}</span>
+                  Source wiring
+                </button>
+                <span className={labelClass}>·</span>
+                <button
+                  type="button"
+                  className={`${labelClass} text-[11px] hover:underline flex items-center gap-0.5`}
+                  onClick={() => toggle('target')}
+                >
+                  <span className="text-[9px]">{shown === 'target' ? '▼' : '▶'}</span>
+                  Target wiring
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className={`${labelClass} text-[11px] hover:underline flex items-center gap-0.5`}
+                onClick={() => toggle(singleSide)}
+              >
+                <span className="text-[9px]">{shown === singleSide ? '▼' : '▶'}</span>
+                {showFeeding ? 'Collection wiring' : 'Show wiring'}
+              </button>
+            )}
+          </div>
+          {shown === 'source' && sourceHasSplit && buildingShare && (
+            <WiringDiagram
+              splitInfo={distribution!.splitInfo!}
+              totalBuildings={Math.ceil(buildingShare.toNumber())}
+              beltsNeeded={beltsNeeded}
+              buildingType={sourceBuildingType}
+              isDark={isDark}
+            />
+          )}
+          {shown === 'target' && targetHasSplit && targetBuildingCount && (
+            <WiringDiagram
+              splitInfo={targetDistribution!.splitInfo!}
+              totalBuildings={Math.ceil(targetBuildingCount.toNumber())}
+              beltsNeeded={beltsNeeded}
+              buildingType={targetBuildingType}
+              isDark={isDark}
+            />
+          )}
+        </>
       )}
     </>
   );
