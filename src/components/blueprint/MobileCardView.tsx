@@ -257,18 +257,46 @@ function InputDetailPanel({ detail, isDark }: { detail: EdgeDetail; isDark: bool
             )}
             {targetBuildingDist.shortLabel}
           </div>
-          {targetBuildingDist.partialTargetFraction && targetBuildingDist.partialTargetSourceCount && (
-            <div className={`${labelClass} text-[11px] ml-5 flex items-center gap-0.5 flex-wrap`}>
-              <span>{targetBuildingDist.fullTargetBuildings} full</span>
-              {targetBuildingType && <BuildingIcon buildingType={targetBuildingType as BuildingType} itemId={edge.toItemId} size="sm" />}
-              <span>&times; {targetBuildingDist.fullTargetSourceCount.isInteger() ? targetBuildingDist.fullTargetSourceCount.toNumber() : targetBuildingDist.fullTargetSourceCount.toDecimalString()}</span>
-              {sourceBuildingType && <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={detail.sourceItemId} size="sm" />}
-              <span>+ 1 partial ({String(targetBuildingDist.partialTargetFraction.numerator)}/{String(targetBuildingDist.partialTargetFraction.denominator)})</span>
-              {targetBuildingType && <BuildingIcon buildingType={targetBuildingType as BuildingType} itemId={edge.toItemId} size="sm" />}
-              <span>&times; {targetBuildingDist.partialTargetSourceCount.isInteger() ? targetBuildingDist.partialTargetSourceCount.toNumber() : targetBuildingDist.partialTargetSourceCount.toDecimalString()}</span>
-              {sourceBuildingType && <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={detail.sourceItemId} size="sm" />}
-            </div>
-          )}
+          {targetBuildingDist.partialTargetFraction && targetBuildingDist.partialTargetSourceCount && (() => {
+            const fullSrc = targetBuildingDist.fullTargetSourceCount.isInteger()
+              ? targetBuildingDist.fullTargetSourceCount.toNumber()
+              : targetBuildingDist.fullTargetSourceCount.toDecimalString();
+            const partialSrc = targetBuildingDist.partialTargetSourceCount!.isInteger()
+              ? targetBuildingDist.partialTargetSourceCount!.toNumber()
+              : targetBuildingDist.partialTargetSourceCount!.toDecimalString();
+            const partialFrac = `${String(targetBuildingDist.partialTargetFraction!.numerator)}/${String(targetBuildingDist.partialTargetFraction!.denominator)}`;
+            const srcIcon = sourceBuildingType ? (
+              <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={detail.sourceItemId} size="sm" />
+            ) : null;
+            const tgtIcon = targetBuildingType ? (
+              <BuildingIcon buildingType={targetBuildingType as BuildingType} itemId={edge.toItemId} size="sm" />
+            ) : null;
+            const sameType = sourceBuildingType === targetBuildingType;
+            const srcItemLabel = sameType ? edge.itemName : null;
+            const tgtItemLabel = sameType ? edge.toItemName : null;
+            return (
+              <div className="text-[11px] ml-2 mt-0.5 space-y-0.5">
+                <div className="flex items-center gap-1">
+                  <span className={labelClass}>×{targetBuildingDist.fullTargetBuildings}</span>
+                  {tgtIcon}
+                  {tgtItemLabel && <span className={labelClass}>{tgtItemLabel}</span>}
+                  <span className={labelClass}>← {fullSrc}</span>
+                  {srcIcon}
+                  {srcItemLabel && <span className={labelClass}>{srcItemLabel}</span>}
+                  <span className={labelClass}>each</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className={labelClass}>×1</span>
+                  {tgtIcon}
+                  {tgtItemLabel && <span className={labelClass}>{tgtItemLabel}</span>}
+                  <span className={labelClass}>← {partialSrc}</span>
+                  {srcIcon}
+                  {srcItemLabel && <span className={labelClass}>{srcItemLabel}</span>}
+                  <span className={`${labelClass} italic`}>({partialFrac} capacity)</span>
+                </div>
+              </div>
+            );
+          })()}
         </>
       )}
       {targetBuildingDist && targetDistribution && (

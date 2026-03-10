@@ -1,11 +1,18 @@
 import { useState } from 'react';
 import { computeWiringLayout, getCompressedInfo } from '../core/wiringLayout';
-import { gcd, isPowerOf2 } from '../core/math/gcd';
+import { gcd } from '../core/math/gcd';
 import { BUILDING_COLORS, BuildingIcon } from './BuildingIcon';
 import type { BeltDistribution, TargetBuildingDistribution } from '../core/beltDistribution';
 import { computeFeedingPattern } from '../core/beltDistribution';
 import type { Rational } from '../core/math/rational';
 import type { BuildingType } from '../data/buildings';
+import { ITEMS } from '../data/items';
+
+function getShortItemLabel(itemId: string): string {
+  const item = ITEMS[itemId];
+  if (!item) return itemId;
+  return item.name.split(/[\s_]+/)[0];
+}
 
 interface WiringDiagramSectionProps {
   distribution: BeltDistribution | null;
@@ -165,6 +172,7 @@ function FeedingPatternSection({
   sourceBuildingType,
   targetBuildingType,
   sourceItemId,
+  targetItemId,
   labelClass,
 }: FeedingPatternSectionProps) {
   const srcIcon = sourceBuildingType ? (
@@ -172,172 +180,127 @@ function FeedingPatternSection({
   ) : null;
   const { dedicatedPerTarget, sharedSources, targetPerGroup, groupCount, remainingTargets, hasPartial, partialTargetFraction, partialSourceCount } = pattern;
 
-  // Splitter tip for a given numerator/denominator fraction
-  const renderSplitterTip = (numer: number, denom: number) => {
+  // Target label prefix from item name
+  const targetPrefix = targetItemId
+    ? getShortItemLabel(targetItemId)
+    : targetBuildingType ? targetBuildingType.charAt(0).toUpperCase() : 'T';
+
+  const totalTargets = groupCount * targetPerGroup + remainingTargets + (hasPartial ? 1 : 0);
+  const targetLabels = Array.from({ length: totalTargets }, (_, i) => `${targetPrefix} ${i + 1}`);
+
+  // Splitter ratio text (e.g. "1:4 splitter")
+  const splitterRatio = (numer: number, denom: number): string | null => {
     const g = gcd(numer, denom);
     const n = numer / g;
     const d = denom / g;
     if (d <= 1) return null;
-    return (
-      <div className={`${labelClass} italic pl-2 mt-0.5`}>
-        Use a 1:{d} splitter
-        {n > 1 && ` · route ${n} of ${d} outputs`}
-        {isPowerOf2(d) && d > 2 && ` · ${Math.log2(d)}× cascade`}
-      </div>
-    );
+    return n > 1 ? `1:${d} splitter — send ${n} of ${d}` : `1:${d} splitter`;
   };
 
-  // Generate target labels: F1, F2, ... using first letter of target building type
-  const targetInitial = targetBuildingType ? targetBuildingType.charAt(0).toUpperCase() : 'T';
+  // Build a flat list of routing lines
+  const lines: { label: string; fraction: string | null; note?: string; isLast: boolean; isBranch: boolean }[] = [];
 
-  const totalTargets = groupCount * targetPerGroup + remainingTargets + (hasPartial ? 1 : 0);
-  const targetLabels = Array.from({ length: totalTargets }, (_, i) => `${targetInitial}${i + 1}`);
-
-  const showGroupHeaders = groupCount > 1 || remainingTargets > 0 || hasPartial;
-  const collapseDedicated = dedicatedPerTarget > 3;
-
-  // Render lines for a set of targets within a group
-  const renderGroupLines = (labels: string[]) => {
-    const lines: React.ReactNode[] = [];
-
-    // Dedicated lines
-    if (dedicatedPerTarget > 0) {
-      if (collapseDedicated) {
-        // Collapsed: one summary line per target
-        for (const label of labels) {
-          lines.push(
-            <div key={`ded-${label}`} className="flex items-center gap-1 flex-wrap pl-2">
-              <span>{dedicatedPerTarget}×</span>
-              {srcIcon}
-              <span>→ {label}</span>
-              <span className={labelClass}>dedicated</span>
-            </div>
-          );
-        }
-      } else {
-        // Expanded: one line per extractor per target
-        for (const label of labels) {
-          for (let d = 0; d < dedicatedPerTarget; d++) {
-            lines.push(
-              <div key={`ded-${label}-${d}`} className="flex items-center gap-1 flex-wrap pl-2">
-                {srcIcon}
-                <span>→ {label}</span>
-                <span className={labelClass}>dedicated</span>
-              </div>
-            );
-          }
-        }
+  // Full groups
+  for (let g = 0; g < groupCount; g++) {
+    const start = g * targetPerGroup;
+    const groupLabels = targetLabels.slice(start, start + targetPerGroup);
+    for (const label of groupLabels) {
+      if (dedicatedPerTarget > 0) {
+        lines.push({
+          label,
+          fraction: dedicatedPerTarget > 1 ? `${dedicatedPerTarget}× dedicated` : 'dedicated',
+          isBranch: true,
+          isLast: false,
+        });
       }
     }
-
-    // Shared lines — each shared source gets its own line
     if (isFractionalRatio && sharedSources > 0) {
-      const joinedLabels = labels.join(' + ');
-      for (let s = 0; s < sharedSources; s++) {
-        lines.push(
-          <div key={`shared-${labels[0]}-${s}`} className="flex items-center gap-1 flex-wrap pl-2">
-            {srcIcon}
-            <span>→ {joinedLabels}</span>
-            <span className={labelClass}>split ({pattern.splitFraction} each)</span>
-          </div>
-        );
-      }
-      const tip = renderSplitterTip(1, targetPerGroup);
-      if (tip) lines.push(<div key={`tip-${labels[0]}`}>{tip}</div>);
+      const sharedLabel = groupLabels.length > 1 ? groupLabels.join(', ') : groupLabels[0];
+      lines.push({
+        label: sharedLabel,
+        fraction: `${pattern.splitFraction} each`,
+        note: splitterRatio(1, targetPerGroup) ?? undefined,
+        isBranch: true,
+        isLast: false,
+      });
     }
+  }
 
-    return lines;
-  };
+  // Remaining targets
+  if (remainingTargets > 0) {
+    const remOffset = groupCount * targetPerGroup;
+    const remLabels = targetLabels.slice(remOffset, remOffset + remainingTargets);
+    const fractionalPerTarget = sharedSources / targetPerGroup;
+    for (const label of remLabels) {
+      if (dedicatedPerTarget > 0) {
+        lines.push({
+          label,
+          fraction: dedicatedPerTarget > 1 ? `${dedicatedPerTarget}× dedicated` : 'dedicated',
+          isBranch: true,
+          isLast: false,
+        });
+      }
+      if (fractionalPerTarget > 0) {
+        lines.push({
+          label,
+          fraction: formatFraction(fractionalPerTarget),
+          note: splitterRatio(sharedSources, targetPerGroup) ?? undefined,
+          isBranch: true,
+          isLast: false,
+        });
+      }
+    }
+  }
 
-  const remainingOffset = groupCount * targetPerGroup;
-  const partialOffset = remainingOffset + remainingTargets;
+  // Partial target
+  if (hasPartial && partialTargetFraction && partialSourceCount) {
+    const partialOffset = groupCount * targetPerGroup + remainingTargets;
+    const partialLabel = targetLabels[partialOffset] ?? `${targetPrefix} ?`;
+    const srcCount = partialSourceCount.isInteger()
+      ? String(partialSourceCount.toNumber())
+      : partialSourceCount.toDecimalString();
+    lines.push({
+      label: partialLabel,
+      fraction: `${srcCount} (${String(partialTargetFraction.numerator)}/${String(partialTargetFraction.denominator)} capacity)`,
+      note: 'remaining output',
+      isBranch: true,
+      isLast: true,
+    });
+  }
+
+  // Mark last line
+  if (lines.length > 0) {
+    lines[lines.length - 1].isLast = true;
+  }
 
   return (
-    <div className="mt-1 space-y-0.5 text-[11px]">
-      {/* Full groups */}
-      {Array.from({ length: groupCount }, (_, g) => {
-        const start = g * targetPerGroup;
-        const groupLabels = targetLabels.slice(start, start + targetPerGroup);
-        return (
-          <div key={`group-${g}`}>
-            {showGroupHeaders && (
-              <div className={`${labelClass} font-medium`}>
-                Group {g + 1} ({groupLabels.join(', ')}):
-              </div>
-            )}
-            {renderGroupLines(groupLabels)}
-          </div>
-        );
-      })}
+    <div className="mt-1.5 text-[11px] font-mono">
+      {/* Root: source icon with arrow */}
+      <div className="flex items-center gap-1">
+        {srcIcon}
+        {sourceBuildingType === targetBuildingType && sourceItemId && (
+          <span className={labelClass}>{getShortItemLabel(sourceItemId)}</span>
+        )}
+        <span className={labelClass}>→</span>
+        {targetPerGroup > 1 && (
+          <span className={labelClass}>{splitterRatio(1, targetPerGroup)}</span>
+        )}
+      </div>
 
-      {/* Remaining targets (incomplete group — can't form full split pattern) */}
-      {remainingTargets > 0 && (() => {
-        const remLabels = targetLabels.slice(remainingOffset, remainingOffset + remainingTargets);
-        const remSourceCount = formatRemainingSourceCount(pattern, remainingTargets);
-        // Each remaining target needs dedicatedPerTarget full + sharedSources/targetPerGroup fractional
-        const fractionalPerTarget = sharedSources / targetPerGroup;
-        return (
-          <div key="remaining">
-            <div className={`${labelClass} font-medium`}>
-              Remaining ({remLabels.join(', ')}):
-            </div>
-            {/* Dedicated lines for remaining targets */}
-            {dedicatedPerTarget > 0 && remLabels.map(label =>
-              collapseDedicated ? (
-                <div key={`rem-ded-${label}`} className="flex items-center gap-1 flex-wrap pl-2">
-                  <span>{dedicatedPerTarget}×</span>
-                  {srcIcon}
-                  <span>→ {label}</span>
-                  <span className={labelClass}>dedicated</span>
-                </div>
-              ) : (
-                Array.from({ length: dedicatedPerTarget }, (_, d) => (
-                  <div key={`rem-ded-${label}-${d}`} className="flex items-center gap-1 flex-wrap pl-2">
-                    {srcIcon}
-                    <span>→ {label}</span>
-                    <span className={labelClass}>dedicated</span>
-                  </div>
-                ))
-              )
-            )}
-            {/* Fractional source per remaining target */}
-            {fractionalPerTarget > 0 && remLabels.map(label => (
-              <div key={`rem-frac-${label}`} className="flex items-center gap-1 flex-wrap pl-2">
-                <span>{formatFraction(fractionalPerTarget)}</span>
-                {srcIcon}
-                <span>→ {label}</span>
-                <span className={labelClass}>partial capacity</span>
-              </div>
-            ))}
-            {fractionalPerTarget > 0 && renderSplitterTip(sharedSources, pattern.targetPerGroup)}
-            <div className={`${labelClass} pl-2 flex items-center gap-1`}>
-              <span>({remSourceCount}</span>
-              {srcIcon}
-              <span>total)</span>
-            </div>
+      {/* Tree branches */}
+      {lines.map((line, i) => (
+        <div key={i} className="pl-2">
+          <div className="flex items-center gap-1">
+            <span className={labelClass}>{line.isLast ? '└─' : '├─'}</span>
+            {line.fraction && <span>{line.fraction}</span>}
+            <span>→</span>
+            <span className="font-medium font-sans">{line.label}</span>
           </div>
-        );
-      })()}
-
-      {/* Partial target */}
-      {hasPartial && partialTargetFraction && partialSourceCount && (() => {
-        const partialLabel = targetLabels[partialOffset] ?? `${targetInitial}?`;
-        const srcCount = partialSourceCount.isInteger()
-          ? partialSourceCount.toNumber()
-          : partialSourceCount.toDecimalString();
-        const denom = Number(partialTargetFraction.denominator);
-        const numer = Number(partialTargetFraction.numerator);
-        return (
-          <>
-            <div className="flex items-center gap-1 flex-wrap">
-              <span className={labelClass}>Partial {partialLabel} at {String(partialTargetFraction.numerator)}/{String(partialTargetFraction.denominator)}:</span>
-              <span>{srcCount}</span>
-              {srcIcon}
-            </div>
-            {renderSplitterTip(numer, denom)}
-          </>
-        );
-      })()}
+          {line.note && (
+            <div className={`${labelClass} italic pl-5`}>{line.note}</div>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
@@ -355,11 +318,6 @@ function formatFraction(value: number): string {
   return parseFloat(value.toFixed(2)).toString();
 }
 
-function formatRemainingSourceCount(pattern: ReturnType<typeof computeFeedingPattern>, remainingTargets: number): string {
-  const sourcesNeeded = (pattern.sourcePerGroup * remainingTargets) / pattern.targetPerGroup;
-  if (Number.isInteger(sourcesNeeded)) return sourcesNeeded.toString();
-  return parseFloat(sourcesNeeded.toFixed(2)).toString();
-}
 
 interface WiringDiagramProps {
   splitInfo: { fullBuildings: number; splitNumerator: number; splitDenominator: number };
