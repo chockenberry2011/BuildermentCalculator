@@ -15,7 +15,7 @@ interface BadgePopoverProps {
 function getFloatingPosition(
   anchor: DOMRect,
   floating: DOMRect | null,
-  gap: number = 4,
+  gap: number = 6,
 ) {
   const top = anchor.bottom + gap + window.scrollY;
   let left = anchor.left + window.scrollX;
@@ -122,7 +122,9 @@ export function BadgePopover({ children, tooltipContent, popoverContent, isDark 
   }, [showTooltip, showPopover]);
 
   const tooltipBg = isDark ? 'bg-gray-800 text-gray-200 border-gray-700' : 'bg-gray-900 text-white border-gray-800';
-  const popoverBg = isDark ? 'bg-gray-800 text-gray-200 border-gray-600' : 'bg-white text-gray-900 border-gray-200';
+  const popoverBg = isDark ? 'bg-gray-800/95 backdrop-blur-sm text-gray-200 border-gray-600' : 'bg-white text-gray-900 border-gray-200';
+  const caretColor = isDark ? '#1f2937' : '#ffffff';
+  const caretBorder = isDark ? '#4b5563' : '#e5e7eb';
 
   return (
     <>
@@ -156,21 +158,58 @@ export function BadgePopover({ children, tooltipContent, popoverContent, isDark 
       {showPopover && createPortal(
         <div
           ref={popoverRef}
-          className={`z-[9999] min-w-[220px] max-h-[70vh] overflow-y-auto rounded-lg border shadow-xl p-3 text-xs ${popoverBg}`}
-          style={{ top: pos.top, left: pos.left, position: 'absolute' }}
+          className={`z-[9999] max-h-[60vh] overflow-y-auto rounded-lg border shadow-popover p-2.5 text-xs ${popoverBg}`}
+          style={{
+            top: pos.top,
+            left: pos.left,
+            position: 'absolute',
+            animation: 'popover-enter 150ms ease-out',
+          }}
         >
+          {/* Caret arrow */}
+          <div
+            className="absolute -top-1.5 left-4"
+            style={{
+              width: 0,
+              height: 0,
+              borderLeft: '6px solid transparent',
+              borderRight: '6px solid transparent',
+              borderBottom: `6px solid ${caretBorder}`,
+            }}
+          />
+          <div
+            className="absolute -top-1 left-4"
+            style={{
+              width: 0,
+              height: 0,
+              borderLeft: '6px solid transparent',
+              borderRight: '6px solid transparent',
+              borderBottom: `6px solid ${caretColor}`,
+            }}
+          />
           <button
             onClick={() => setShowPopover(false)}
-            className={`absolute top-1.5 right-1.5 p-0.5 rounded ${isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
+            className={`absolute top-1.5 right-1.5 p-1.5 rounded ${isDark ? 'text-gray-500 hover:text-gray-300' : 'text-gray-400 hover:text-gray-600'}`}
             aria-label="Close"
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <svg width="12" height="12" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
               <path d="M2 2l6 6M8 2l-6 6" />
             </svg>
           </button>
           {popoverContent}
         </div>,
         document.body,
+      )}
+
+      {/* Inline style for entrance animation */}
+      {showPopover && createPortal(
+        <style>{`
+          @keyframes popover-enter {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>,
+        document.head,
       )}
     </>
   );

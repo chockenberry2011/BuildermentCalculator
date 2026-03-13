@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { computeWiringLayout, getCompressedInfo } from '../core/wiringLayout';
 import { gcd } from '../core/math/gcd';
-import { BUILDING_COLORS, BuildingIcon } from './BuildingIcon';
+import { BUILDING_COLORS, BuildingIcon, BuildingIconSvg } from './BuildingIcon';
 import type { BeltDistribution, TargetBuildingDistribution } from '../core/beltDistribution';
 import { computeFeedingPattern } from '../core/beltDistribution';
 import type { Rational } from '../core/math/rational';
@@ -75,13 +75,15 @@ export function WiringDiagramSection({
     <>
       {showFeeding && feedingPattern && (
         <>
-          <div className={`border-t my-2 ${dividerClass}`} />
+          <div className={`border-t my-1 ${dividerClass}`} />
           <button
             type="button"
-            className={`${labelClass} text-[11px] hover:underline flex items-center gap-0.5`}
+            className={`${labelClass} text-[11px] hover:underline flex items-center gap-1`}
             onClick={() => setFeedingShown(prev => !prev)}
           >
-            <span className="text-[9px]">{feedingShown ? '▼' : '▶'}</span>
+            <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${feedingShown ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 8 8">
+              <path d="M2 1l4 3-4 3z" />
+            </svg>
             Wiring pattern
           </button>
           {feedingShown && (
@@ -93,41 +95,49 @@ export function WiringDiagramSection({
               sourceItemId={sourceItemId}
               targetItemId={targetItemId}
               labelClass={labelClass}
+              isDark={isDark}
+              beltsNeeded={beltsNeeded}
             />
           )}
         </>
       )}
       {showBeltWiring && (
         <>
-          <div className={`border-t my-2 ${dividerClass}`} />
+          <div className={`border-t my-1 ${dividerClass}`} />
           <div className="flex items-center gap-2">
             {hasBoth ? (
               <>
                 <button
                   type="button"
-                  className={`${labelClass} text-[11px] hover:underline flex items-center gap-0.5`}
+                  className={`${labelClass} text-[11px] hover:underline flex items-center gap-1`}
                   onClick={() => toggle('source')}
                 >
-                  <span className="text-[9px]">{shown === 'source' ? '▼' : '▶'}</span>
+                  <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${shown === 'source' ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 8 8">
+                    <path d="M2 1l4 3-4 3z" />
+                  </svg>
                   Source wiring
                 </button>
                 <span className={labelClass}>·</span>
                 <button
                   type="button"
-                  className={`${labelClass} text-[11px] hover:underline flex items-center gap-0.5`}
+                  className={`${labelClass} text-[11px] hover:underline flex items-center gap-1`}
                   onClick={() => toggle('target')}
                 >
-                  <span className="text-[9px]">{shown === 'target' ? '▼' : '▶'}</span>
+                  <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${shown === 'target' ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 8 8">
+                    <path d="M2 1l4 3-4 3z" />
+                  </svg>
                   Target wiring
                 </button>
               </>
             ) : (
               <button
                 type="button"
-                className={`${labelClass} text-[11px] hover:underline flex items-center gap-0.5`}
+                className={`${labelClass} text-[11px] hover:underline flex items-center gap-1`}
                 onClick={() => toggle(singleSide)}
               >
-                <span className="text-[9px]">{shown === singleSide ? '▼' : '▶'}</span>
+                <svg className={`w-2.5 h-2.5 transition-transform duration-200 ${shown === singleSide ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 8 8">
+                  <path d="M2 1l4 3-4 3z" />
+                </svg>
                 {showFeeding ? 'Collection wiring' : 'Show wiring'}
               </button>
             )}
@@ -164,6 +174,8 @@ interface FeedingPatternSectionProps {
   sourceItemId?: string;
   targetItemId?: string;
   labelClass: string;
+  isDark: boolean;
+  beltsNeeded: number;
 }
 
 function FeedingPatternSection({
@@ -174,6 +186,8 @@ function FeedingPatternSection({
   sourceItemId,
   targetItemId,
   labelClass,
+  isDark,
+  beltsNeeded,
 }: FeedingPatternSectionProps) {
   const srcIcon = sourceBuildingType ? (
     <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={sourceItemId} size="sm" />
@@ -187,6 +201,9 @@ function FeedingPatternSection({
 
   const totalTargets = groupCount * targetPerGroup + remainingTargets + (hasPartial ? 1 : 0);
   const targetLabels = Array.from({ length: totalTargets }, (_, i) => `${targetPrefix} ${i + 1}`);
+
+  // When groups align with belts, show simplified belt-level routing
+  const beltAligned = beltsNeeded > 1 && groupCount === beltsNeeded && remainingTargets === 0 && !hasPartial;
 
   // Splitter ratio text (e.g. "1:4 splitter")
   const splitterRatio = (numer: number, denom: number): string | null => {
@@ -273,34 +290,122 @@ function FeedingPatternSection({
     lines[lines.length - 1].isLast = true;
   }
 
+  const connectorColor = isDark ? 'border-gray-600' : 'border-gray-300';
+  const arrowColor = isDark ? 'text-blue-400' : 'text-blue-500';
+
+  // Simplified belt-level rendering when groups align with belts
+  if (beltAligned) {
+    const targetsPerBelt = targetPerGroup;
+    const beltSplitterLabel = targetsPerBelt > 1
+      ? `1:${targetsPerBelt} splitter`
+      : null;
+
+    return (
+      <div className="mt-1 text-[11px]">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          {srcIcon}
+          <span className={labelClass}>Per belt</span>
+          <span className={arrowColor}>
+            <svg width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M0 4h10M8 1.5L10.5 4 8 6.5" /></svg>
+          </span>
+          {beltSplitterLabel && (
+            <span className={labelClass}>{beltSplitterLabel}</span>
+          )}
+        </div>
+        <div className="relative ml-2">
+          {Array.from({ length: beltsNeeded }, (_, beltIdx) => {
+            const start = beltIdx * targetsPerBelt;
+            const beltTargets = targetLabels.slice(start, start + targetsPerBelt);
+            const isLastBelt = beltIdx === beltsNeeded - 1;
+            return (
+              <div key={beltIdx} className="relative flex items-start">
+                {!isLastBelt && (
+                  <div
+                    className={`absolute left-1 top-0 bottom-0 border-l-2 ${connectorColor}`}
+                    style={{ width: 0 }}
+                  />
+                )}
+                {isLastBelt && (
+                  <div
+                    className={`absolute left-1 top-0 border-l-2 ${connectorColor}`}
+                    style={{ width: 0, height: '12px' }}
+                  />
+                )}
+                <div
+                  className={`absolute left-1 top-2.5 border-t-2 ${connectorColor}`}
+                  style={{ width: '10px' }}
+                />
+                <div className="pl-4 py-px">
+                  <div className="flex items-center gap-1">
+                    <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>Belt {beltIdx + 1}</span>
+                    <span className={arrowColor}>
+                      <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M0 3h8M6 1l2 2-2 2" /></svg>
+                    </span>
+                    <span className="font-medium">{beltTargets.join(', ')}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="mt-1.5 text-[11px] font-mono">
+    <div className="mt-1 text-[11px]">
       {/* Root: source icon with arrow */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         {srcIcon}
         {sourceBuildingType === targetBuildingType && sourceItemId && (
           <span className={labelClass}>{getShortItemLabel(sourceItemId)}</span>
         )}
-        <span className={labelClass}>→</span>
+        <span className={arrowColor}>
+          <svg width="12" height="8" viewBox="0 0 12 8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M0 4h10M8 1.5L10.5 4 8 6.5" /></svg>
+        </span>
         {targetPerGroup > 1 && (
           <span className={labelClass}>{splitterRatio(1, targetPerGroup)}</span>
         )}
       </div>
 
-      {/* Tree branches */}
-      {lines.map((line, i) => (
-        <div key={i} className="pl-2">
-          <div className="flex items-center gap-1">
-            <span className={labelClass}>{line.isLast ? '└─' : '├─'}</span>
-            {line.fraction && <span>{line.fraction}</span>}
-            <span>→</span>
-            <span className="font-medium font-sans">{line.label}</span>
+      {/* Tree branches with CSS connectors */}
+      <div className="relative ml-2">
+        {lines.map((line, i) => (
+          <div key={i} className="relative flex items-start">
+            {/* Vertical connector line */}
+            {!line.isLast && (
+              <div
+                className={`absolute left-1 top-0 bottom-0 border-l-2 ${connectorColor}`}
+                style={{ width: 0 }}
+              />
+            )}
+            {/* Partial vertical for last item */}
+            {line.isLast && (
+              <div
+                className={`absolute left-1 top-0 border-l-2 ${connectorColor}`}
+                style={{ width: 0, height: '12px' }}
+              />
+            )}
+            {/* Horizontal stub */}
+            <div
+              className={`absolute left-1 top-2.5 border-t-2 ${connectorColor}`}
+              style={{ width: '10px' }}
+            />
+            <div className="pl-4 py-px">
+              <div className="flex items-center gap-1">
+                {line.fraction && <span className={isDark ? 'text-gray-300' : 'text-gray-600'}>{line.fraction}</span>}
+                <span className={arrowColor}>
+                  <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M0 3h8M6 1l2 2-2 2" /></svg>
+                </span>
+                <span className="font-medium">{line.label}</span>
+              </div>
+              {line.note && (
+                <div className={`${labelClass} italic text-[10px] ml-0.5`}>{line.note}</div>
+              )}
+            </div>
           </div>
-          {line.note && (
-            <div className={`${labelClass} italic pl-5`}>{line.note}</div>
-          )}
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -327,7 +432,7 @@ interface WiringDiagramProps {
   isDark: boolean;
 }
 
-const BUILDING_SIZE = 16;
+const BUILDING_SIZE = 24;
 
 function WiringDiagram({ splitInfo, totalBuildings, beltsNeeded, buildingType, isDark }: WiringDiagramProps) {
   const { fullBuildings } = splitInfo;
@@ -345,53 +450,60 @@ function WiringDiagram({ splitInfo, totalBuildings, beltsNeeded, buildingType, i
   const mergeColor = isDark ? '#60A5FA' : '#3B82F6';
   const bgColor = isDark ? '#1F2937' : '#F9FAFB';
 
-  // Building initial letter
-  const buildingInitial = buildingType
-    ? buildingType.charAt(0).toUpperCase()
-    : 'B';
+  // Gradient ID for belt flow direction
+  const gradientId = `belt-grad-${buildingType}-${beltsNeeded}`;
 
   return (
     <svg
       viewBox={`0 0 ${layout.width} ${layout.height}`}
-      width={Math.min(layout.width, 280)}
-      height={Math.min(layout.height, 280 * (layout.height / layout.width))}
-      className="mt-1"
+      width={Math.min(layout.width, 340)}
+      height={Math.min(layout.height, 340 * (layout.height / layout.width))}
+      className="mt-1.5"
       role="img"
       aria-label="Belt wiring diagram"
     >
-      <rect width={layout.width} height={layout.height} fill={bgColor} rx="4" />
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={beltLineColor} stopOpacity="0.4" />
+          <stop offset="50%" stopColor={beltLineColor} stopOpacity="1" />
+          <stop offset="100%" stopColor={beltLineColor} stopOpacity="0.6" />
+        </linearGradient>
+      </defs>
+      <rect width={layout.width} height={layout.height} fill={bgColor} rx="6" />
 
       {/* Belt rows */}
       {layout.belts.map((belt) => (
         <g key={belt.beltIndex}>
           {/* Belt label */}
           <text
-            x={4}
+            x={6}
             y={belt.y + 4}
             fill={labelColor}
-            fontSize="9"
-            fontFamily="monospace"
+            fontSize="11"
+            fontFamily="Inter, system-ui, sans-serif"
+            fontWeight="500"
           >
             B{belt.beltIndex + 1}
           </text>
 
           {/* Belt line before buildings */}
           <line
-            x1={24}
+            x1={30}
             y1={belt.y}
-            x2={belt.buildings.length > 0 ? belt.buildings[0].x - 2 : belt.endX}
+            x2={belt.buildings.length > 0 ? belt.buildings[0].x - 3 : belt.endX}
             y2={belt.y}
-            stroke={beltLineColor}
-            strokeWidth="1.5"
+            stroke={`url(#${gradientId})`}
+            strokeWidth="2"
+            strokeLinecap="round"
           />
 
           {/* Arrow tip at start */}
           <polygon
-            points={`${26},${belt.y - 3} ${30},${belt.y} ${26},${belt.y + 3}`}
+            points={`${33},${belt.y - 3.5} ${38},${belt.y} ${33},${belt.y + 3.5}`}
             fill={beltLineColor}
           />
 
-          {/* Buildings */}
+          {/* Buildings — use BuildingIconSvg for actual shapes */}
           {belt.buildings.map((building, i) => (
             <g key={i}>
               <rect
@@ -399,20 +511,18 @@ function WiringDiagram({ splitInfo, totalBuildings, beltsNeeded, buildingType, i
                 y={building.y}
                 width={BUILDING_SIZE}
                 height={BUILDING_SIZE}
-                rx="2"
+                rx="4"
                 fill={buildingColor}
-                opacity={0.85}
+                opacity={0.9}
               />
-              <text
-                x={building.x + BUILDING_SIZE / 2}
-                y={building.y + BUILDING_SIZE / 2 + 3}
-                fill="white"
-                fontSize="9"
-                fontFamily="monospace"
-                textAnchor="middle"
-              >
-                {buildingInitial}
-              </text>
+              {buildingType && (
+                <BuildingIconSvg
+                  buildingType={buildingType as BuildingType}
+                  x={building.x + 4}
+                  y={building.y + 4}
+                  size={BUILDING_SIZE - 8}
+                />
+              )}
             </g>
           ))}
 
@@ -422,8 +532,8 @@ function WiringDiagram({ splitInfo, totalBuildings, beltsNeeded, buildingType, i
               x={compressed.ellipsisX}
               y={belt.y + 4}
               fill={labelColor}
-              fontSize="10"
-              fontFamily="monospace"
+              fontSize="12"
+              fontFamily="Inter, system-ui, sans-serif"
               textAnchor="middle"
             >
               ···
@@ -438,7 +548,8 @@ function WiringDiagram({ splitInfo, totalBuildings, beltsNeeded, buildingType, i
               x2={layout.mergeZone.x}
               y2={belt.y}
               stroke={mergeColor}
-              strokeWidth="1.5"
+              strokeWidth="2"
+              strokeLinecap="round"
             />
           ) : (
             <>
@@ -446,13 +557,14 @@ function WiringDiagram({ splitInfo, totalBuildings, beltsNeeded, buildingType, i
               <line
                 x1={belt.endX - BUILDING_SIZE / 2}
                 y1={belt.y}
-                x2={belt.endX + 8}
+                x2={belt.endX + 10}
                 y2={belt.y}
                 stroke={beltLineColor}
-                strokeWidth="1.5"
+                strokeWidth="2"
+                strokeLinecap="round"
               />
               <polygon
-                points={`${belt.endX + 4},${belt.y - 3} ${belt.endX + 8},${belt.y} ${belt.endX + 4},${belt.y + 3}`}
+                points={`${belt.endX + 6},${belt.y - 3.5} ${belt.endX + 10},${belt.y} ${belt.endX + 6},${belt.y + 3.5}`}
                 fill={beltLineColor}
               />
             </>
@@ -464,10 +576,11 @@ function WiringDiagram({ splitInfo, totalBuildings, beltsNeeded, buildingType, i
       {compressed && (
         <text
           x={compressed.ellipsisX}
-          y={layout.height - 2}
+          y={layout.height - 3}
           fill={labelColor}
-          fontSize="8"
-          fontFamily="monospace"
+          fontSize="10"
+          fontFamily="Inter, system-ui, sans-serif"
+          fontWeight="500"
           textAnchor="middle"
         >
           ×{compressed.totalCount}
@@ -484,58 +597,64 @@ function WiringDiagram({ splitInfo, totalBuildings, beltsNeeded, buildingType, i
             x2={layout.mergeZone.x}
             y2={layout.belts[layout.belts.length - 1].y}
             stroke={mergeColor}
-            strokeWidth="1.5"
+            strokeWidth="2"
+            strokeLinecap="round"
           />
 
           {/* Horizontal line from bracket to shared buildings */}
           <line
             x1={layout.mergeZone.x}
             y1={layout.height / 2}
-            x2={layout.mergeZone.buildings[0].x - 2}
+            x2={layout.mergeZone.buildings[0].x - 3}
             y2={layout.height / 2}
             stroke={mergeColor}
-            strokeWidth="1.5"
+            strokeWidth="2"
+            strokeLinecap="round"
           />
 
-          {/* Shared buildings */}
+          {/* Shared buildings — solid fill at reduced opacity with glow */}
           {layout.mergeZone.buildings.map((building, i) => (
             <g key={i}>
+              <rect
+                x={building.x - 1}
+                y={building.y - 1}
+                width={BUILDING_SIZE + 2}
+                height={BUILDING_SIZE + 2}
+                rx="5"
+                fill={mergeColor}
+                opacity={0.15}
+              />
               <rect
                 x={building.x}
                 y={building.y}
                 width={BUILDING_SIZE}
                 height={BUILDING_SIZE}
-                rx="2"
+                rx="4"
                 fill={buildingColor}
-                opacity={0.5}
-                stroke={buildingColor}
-                strokeWidth="1"
-                strokeDasharray="3 2"
+                opacity={0.55}
               />
-              <text
-                x={building.x + BUILDING_SIZE / 2}
-                y={building.y + BUILDING_SIZE / 2 + 3}
-                fill={isDark ? '#D1D5DB' : '#374151'}
-                fontSize="9"
-                fontFamily="monospace"
-                textAnchor="middle"
-              >
-                {buildingInitial}
-              </text>
+              {buildingType && (
+                <BuildingIconSvg
+                  buildingType={buildingType as BuildingType}
+                  x={building.x + 4}
+                  y={building.y + 4}
+                  size={BUILDING_SIZE - 8}
+                />
+              )}
             </g>
           ))}
 
-          {/* "(shared)" label */}
-          <text
-            x={layout.mergeZone.buildings[0].x + BUILDING_SIZE / 2}
-            y={layout.mergeZone.buildings[layout.mergeZone.buildings.length - 1].y + BUILDING_SIZE + 10}
-            fill={labelColor}
-            fontSize="7"
-            fontFamily="monospace"
-            textAnchor="middle"
-          >
-            (shared)
-          </text>
+          {/* Merge icon instead of "(shared)" text */}
+          <g transform={`translate(${layout.mergeZone.buildings[0].x + BUILDING_SIZE / 2 - 6}, ${layout.mergeZone.buildings[layout.mergeZone.buildings.length - 1].y + BUILDING_SIZE + 6})`}>
+            <path
+              d="M0 6 L6 0 L12 6 M6 0 L6 10"
+              fill="none"
+              stroke={mergeColor}
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </g>
         </g>
       )}
     </svg>

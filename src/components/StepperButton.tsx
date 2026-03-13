@@ -15,7 +15,7 @@ export function StepperButton({ direction, onClick, isDark }: StepperButtonProps
       onClick={onClick}
       tabIndex={-1}
       title={direction === 'increment' ? 'Increase' : 'Decrease'}
-      className={`w-5 h-5 flex items-center justify-center rounded-full transition-colors flex-shrink-0 ${
+      className={`w-7 h-7 flex items-center justify-center rounded-full active:scale-90 transition-[colors,transform] flex-shrink-0 ${
         isDark
           ? 'bg-gray-700 text-blue-400 hover:bg-blue-900/60 hover:text-blue-300 active:bg-blue-800/60'
           : 'bg-gray-100 text-blue-500 hover:bg-blue-100 hover:text-blue-600 active:bg-blue-200'

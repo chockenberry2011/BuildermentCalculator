@@ -46,12 +46,16 @@ export function CollapsibleSection({
     }
   };
 
-  const cardClasses = `${isDark ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg p-3 sm:p-4`;
+  const cardClasses = isDark
+    ? 'bg-gray-800 border border-gray-700/50'
+    : 'bg-white border border-gray-200';
 
   return (
     <div className={className}>
       <div
-        className={`${cardClasses} cursor-pointer flex items-center justify-between select-none ${isOpen ? 'rounded-b-none' : ''}`}
+        className={`${cardClasses} shadow-card cursor-pointer flex items-center justify-between select-none p-3 sm:p-4 ${
+          isOpen ? 'rounded-t-card rounded-b-none' : 'rounded-card'
+        } transition-shadow hover:shadow-card-hover`}
         role="button"
         tabIndex={0}
         aria-expanded={isOpen}
@@ -59,6 +63,14 @@ export function CollapsibleSection({
         onKeyDown={handleKeyDown}
       >
         <span className="flex items-baseline gap-2">
+          {/* Accent bar indicator */}
+          <span
+            className={`w-0.5 self-stretch rounded-full transition-all duration-300 ${
+              isOpen
+                ? 'bg-blue-500 opacity-100'
+                : 'bg-transparent opacity-0'
+            }`}
+          />
           <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
             {title}
           </span>
@@ -75,7 +87,7 @@ export function CollapsibleSection({
           </div>
         )}
         <svg
-          className={`w-4 h-4 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''} ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+          className={`w-4 h-4 flex-shrink-0 transition-transform duration-300 ease-out ${isOpen ? 'rotate-180' : ''} ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -83,11 +95,17 @@ export function CollapsibleSection({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </div>
-      {isOpen && (
-        <div className={`${cardClasses} rounded-t-none border-t-0 ${contentClassName ?? ''}`}>
-          {children}
+      {/* Animated content area using grid trick */}
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-out"
+        style={{ gridTemplateRows: isOpen ? '1fr' : '0fr' }}
+      >
+        <div className="overflow-hidden">
+          <div className={`${cardClasses} shadow-card rounded-t-none rounded-b-card border-t-0 p-3 sm:p-4 ${contentClassName ?? ''}`}>
+            {children}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

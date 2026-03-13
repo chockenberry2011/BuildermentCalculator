@@ -56,7 +56,7 @@ function cycleProgress(
   setBlueprintProgressState(node.itemId, nextState);
 }
 
-function MobileTreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCount, constraintSource, blueprintProgress, setBlueprintProgressState }: Omit<TreeNodeProps, 'isSmallScreen'>) {
+function MobileTreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCount, constraintSource, blueprintProgress, setBlueprintProgressState }: Omit<TreeNodeProps, 'isSmallScreen' | 'isLastChild' | 'parentHasMore'>) {
   const indent = Math.min(depth * 12, 48);
   const accentColor = getItemColor(node.itemId);
 
@@ -178,6 +178,8 @@ function MobileTreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildi
 }
 
 function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCount, constraintSource, blueprintProgress, setBlueprintProgressState, isSmallScreen }: TreeNodeProps) {
+  const nodeProgressState = useNodeProgress(node, blueprintProgress);
+
   if (isSmallScreen) {
     return (
       <MobileTreeNode
@@ -193,7 +195,7 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
     );
   }
 
-  const indent = Math.min(depth * 16, 64);
+  const accentColor = getItemColor(node.itemId);
 
   const buildingInfo = node.building;
   const buildingName = buildingInfo
@@ -202,16 +204,33 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
 
   const rate = node.ratePerMinute.toNumber();
   const isConstraint = constraintSource.type === 'itemBuilding' && constraintSource.itemId === node.itemId;
-  const nodeProgressState = useNodeProgress(node, blueprintProgress);
 
   const beltConnection = beltResult
     ? beltResult.connections.find((c) => c.fromItemId === node.itemId)
     : null;
 
+  const connectorColor = isDark ? 'border-gray-600' : 'border-gray-300';
+
   return (
-    <div className="font-mono text-xs sm:text-sm">
+    <div className="text-sm relative">
+      {/* Vertical indentation guides */}
+      {depth > 0 && (
+        <div className="absolute top-0 bottom-0 pointer-events-none" style={{ left: 0 }}>
+          {Array.from({ length: depth }, (_, d) => (
+            <div
+              key={d}
+              className={`absolute top-0 bottom-0 border-l ${connectorColor}`}
+              style={{
+                left: `${d * 16 + 8}px`,
+                opacity: 0.4,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
       <div
-        className={`flex flex-nowrap items-center py-1 rounded px-2 cursor-pointer ${
+        className={`flex flex-nowrap items-center py-1.5 rounded-md px-2 cursor-pointer transition-colors ${
           nodeProgressState === 'completed'
             ? isDark
               ? 'bg-green-900/60 hover:bg-green-900/80'
@@ -222,35 +241,41 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
                 : 'bg-amber-50 hover:bg-amber-100'
               : isDark
                 ? 'hover:bg-gray-700/50'
-                : 'hover:bg-gray-100'
+                : 'hover:bg-gray-50'
         }`}
-        style={{ paddingLeft: `${indent + 8}px`, opacity: nodeProgressState === 'completed' ? 0.6 : 1 }}
+        style={{
+          paddingLeft: `${depth * 16 + 8}px`,
+          opacity: nodeProgressState === 'completed' ? 0.6 : 1,
+          borderLeft: depth > 0 ? `3px solid ${accentColor}` : undefined,
+        }}
         onClick={() => cycleProgress(node, nodeProgressState, blueprintProgress, setBlueprintProgressState)}
       >
-        {/* Left side: connector + name + rate + dashed fill — fixed width so inputs align */}
-        <div className="flex items-center gap-2 w-[280px] flex-shrink-0">
-          {depth > 0 && (
-            <span className={isDark ? 'text-gray-600' : 'text-gray-400'}>
-              {depth === 1 ? '\u251C\u2500\u2500' : '\u2514\u2500\u2500'}
-            </span>
-          )}
-          <span className="font-medium truncate" style={{ color: getItemColor(node.itemId) }}>
+        {/* CSS connector stubs for tree structure */}
+        {depth > 0 && (
+          <div className="relative flex items-center mr-2" style={{ width: '12px', height: '100%' }}>
+            <div className={`absolute border-t-2 ${connectorColor}`} style={{ width: '12px', top: '50%' }} />
+          </div>
+        )}
+
+        {/* Item name with colored pill background */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span
+            className="font-medium truncate px-1.5 py-0.5 rounded-md text-sm"
+            style={{
+              color: accentColor,
+              backgroundColor: accentColor + '15',
+            }}
+          >
             {node.itemName}
           </span>
-          <span className={`flex-shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+          <span className={`flex-shrink-0 text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
             {rate.toFixed(2)}/min
           </span>
-          {buildingInfo && (
-            <div
-              className="flex-1 min-w-[8px] border-b-2 border-dashed self-center"
-              style={{ height: '0.5em', borderColor: getItemColor(node.itemId) + '90' }}
-            />
-          )}
         </div>
 
-        {/* Right side: building info — aligned across siblings */}
+        {/* Building info */}
         {buildingInfo && (
-          <div className="flex items-center gap-1.5 ml-2">
+          <div className="flex items-center gap-1.5 ml-3">
             <EditableBuildingCount
               count={buildingInfo.count}
               isConstraint={isConstraint}
@@ -258,10 +283,10 @@ function TreeNode({ node, depth, isDark, beltResult, setRateFromItemBuildingCoun
               isDark={isDark}
             />
             <BuildingIcon buildingType={buildingInfo.buildingType} itemId={node.itemId} />
-            <span className={isDark ? 'text-gray-400' : 'text-gray-500'}>
+            <span className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
               {buildingName}
               {buildingInfo.level > 1 && (
-                <span className={`text-xs ml-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                <span className={`ml-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                   Lv{buildingInfo.level}
                 </span>
               )}
@@ -353,31 +378,47 @@ export function ProductionTree() {
     />
   );
 
+  // Root item header card styling
+  const rootHeaderClass = isDark
+    ? 'bg-gray-700/50 border border-gray-600/50'
+    : 'bg-gray-50 border border-gray-200';
+
   return (
     <div className={isSmallScreen ? 'overflow-x-hidden' : 'overflow-x-auto'}>
       {isMultiRoot ? (
-        productionResult.root.children.map((child, i) => (
-          <div key={`${child.itemId}-${i}`}>
-            <div className={`mb-3 pb-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'} ${i > 0 ? 'mt-4' : ''}`}>
-              <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                {child.itemName}
-              </span>
-              <span className={`ml-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                @ {child.ratePerMinute.toNumber().toFixed(2)}/min
-              </span>
+        productionResult.root.children.map((child, i) => {
+          const itemColor = getItemColor(child.itemId);
+          return (
+            <div key={`${child.itemId}-${i}`}>
+              <div
+                className={`mb-3 rounded-lg overflow-hidden ${rootHeaderClass} ${i > 0 ? 'mt-5' : ''}`}
+              >
+                <div className="h-1" style={{ backgroundColor: itemColor }} />
+                <div className="px-3 py-2">
+                  <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    {child.itemName}
+                  </span>
+                  <span className={`ml-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    @ {child.ratePerMinute.toNumber().toFixed(2)}/min
+                  </span>
+                </div>
+              </div>
+              {renderNode(child, 0)}
             </div>
-            {renderNode(child, 0)}
-          </div>
-        ))
+          );
+        })
       ) : (
         <>
-          <div className={`mb-3 pb-2 border-b ${isDark ? 'border-gray-700' : 'border-gray-200'}`}>
-            <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
-              {productionResult.root.itemName}
-            </span>
-            <span className={`ml-2 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-              @ {targetRate.toFixed(2)}/min
-            </span>
+          <div className={`mb-3 rounded-lg overflow-hidden ${rootHeaderClass}`}>
+            <div className="h-1" style={{ backgroundColor: getItemColor(productionResult.root.itemId) }} />
+            <div className="px-3 py-2">
+              <span className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                {productionResult.root.itemName}
+              </span>
+              <span className={`ml-2 text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                @ {targetRate.toFixed(2)}/min
+              </span>
+            </div>
           </div>
           {renderNode(productionResult.root, 0)}
         </>

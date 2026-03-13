@@ -225,69 +225,50 @@ export const BlueprintEdge = memo(function BlueprintEdge({
     : null;
 
   const popoverContent = (
-    <div className="space-y-1.5">
-      <div className="font-semibold text-sm mb-2">{flatEdge.itemName}</div>
-      <div className="flex justify-between">
-        <span className={labelClass}>Throughput</span>
-        <span className="font-medium">{formatRate(rate)}/min</span>
+    <div className="space-y-1">
+      {/* Header + rate */}
+      <div>
+        <div className="font-semibold text-sm">{flatEdge.itemName}</div>
+        <div className="font-medium mt-1">{formatRate(rate)}/min · {utilizationPct}%</div>
       </div>
+
+      {/* Source info */}
       {shareText && sourceBuildingName && (
-        <>
-          <div className={`border-t my-2 ${dividerClass}`} />
-          <div className={`${labelClass} text-[11px] mb-1`}>Source</div>
-          <div className="flex justify-between items-center">
-            <span className={labelClass}>
-              {sourceIsRaw ? 'Extractors' : sourceBuildingName + 's'}
-            </span>
-            <span className="font-medium flex items-center gap-1">
-              {sourceBuildingType && (
-                <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={flatEdge.fromItemId} size="sm" />
-              )}
-              {shareText} of {totalBuildingText}
-            </span>
+        <div>
+          <div className={`${labelClass} text-[10px] font-semibold uppercase tracking-wider mb-0.5`}>Source</div>
+          <div className="font-medium flex items-center gap-1">
+            {sourceBuildingType && (
+              <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={flatEdge.fromItemId} size="sm" />
+            )}
+            {shareText} of {totalBuildingText} {sourceIsRaw ? 'extractors' : sourceBuildingName.toLowerCase() + 's'}
           </div>
-          <div className="flex justify-between">
-            <span className={labelClass}>Feeds</span>
-            <span className="font-medium">{flatEdge.toItemName}</span>
+          <div className="mt-0.5">
+            <span className={labelClass}>→</span> <span className="font-medium">{flatEdge.toItemName}</span>
           </div>
-        </>
-      )}
-      <div className={`border-t my-2 ${dividerClass}`} />
-      <div className="flex justify-between">
-        <span className={labelClass}>Belts needed</span>
-        <span className="font-medium">{displayBelts}</span>
-      </div>
-      {physicalBeltInfo && physicalBeltInfo.physicalBelts > physicalBeltInfo.throughputBelts && (
-        <div className="flex justify-between">
-          <span className={labelClass}>Belt capacity</span>
-          <span className="font-medium">{physicalBeltInfo.throughputBelts} (throughput)</span>
         </div>
       )}
-      <div className="flex justify-between">
-        <span className={labelClass}>Utilization</span>
-        <span className="font-medium">{utilizationPct}%</span>
-      </div>
-      {perBeltRate !== null && (
-        <div className="flex justify-between">
-          <span className={labelClass}>Per belt</span>
-          <span className="font-medium">{formatRate(perBeltRate)}/min</span>
+
+      {/* Belts */}
+      <div>
+        <div className={`${labelClass} text-[10px] font-semibold uppercase tracking-wider mb-0.5`}>Belts</div>
+        <div className="font-medium">
+          ×{displayBelts}
+          {beltStatus !== 'ok'
+            ? <> · <span style={{ color: statusColor }}>{beltStatus === 'multi-belt' ? 'multi-belt' : 'near capacity'}</span></>
+            : <> · {utilizationPct}%</>
+          }
         </div>
-      )}
-      {beltStatus !== 'ok' && (
-        <>
-          <div className={`border-t my-2 ${dividerClass}`} />
-          <div className="flex justify-between">
-            <span className={labelClass}>Status</span>
-            <span className="font-medium" style={{ color: statusColor }}>
-              {beltStatus === 'multi-belt' ? 'Multi-belt' : 'Near capacity'}
-            </span>
-          </div>
-        </>
-      )}
+        {perBeltRate !== null && (
+          <div className="mt-0.5">{formatRate(perBeltRate)}/min per belt</div>
+        )}
+        {physicalBeltInfo && physicalBeltInfo.physicalBelts > physicalBeltInfo.throughputBelts && (
+          <div className="mt-0.5">{physicalBeltInfo.throughputBelts} throughput</div>
+        )}
+      </div>
       {targetBuildingDist && (
         <>
-          <div className={`border-t my-2 ${dividerClass}`} />
-          <div className={`${labelClass} mb-1`}>Distribution per {targetBuildingName?.toLowerCase() ?? 'target'}</div>
+          <div className={`border-t my-1 ${dividerClass}`} />
+          <div className={`${labelClass} mb-0.5`}>Distribution per {targetBuildingName?.toLowerCase() ?? 'target'}</div>
           <div className="font-medium flex items-center gap-1">
             {sourceBuildingType && (
               <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={flatEdge.fromItemId} size="sm" />
@@ -312,7 +293,7 @@ export const BlueprintEdge = memo(function BlueprintEdge({
             const srcItemLabel = sameType ? flatEdge.itemName : null;
             const tgtItemLabel = sameType ? flatEdge.toItemName : null;
             return (
-              <div className="text-[11px] ml-2 mt-0.5 space-y-0.5">
+              <div className="text-[11px] ml-1 mt-0 space-y-0.5">
                 <div className="flex items-center gap-1">
                   <span className={labelClass}>×{targetBuildingDist.fullTargetBuildings}</span>
                   {tgtIcon}
@@ -338,8 +319,8 @@ export const BlueprintEdge = memo(function BlueprintEdge({
       )}
       {targetBuildingDist && targetDistribution && (
         <>
-          <div className={`border-t my-2 ${dividerClass}`} />
-          <div className={`${labelClass} mb-1`}>Collection per belt</div>
+          <div className={`border-t my-1 ${dividerClass}`} />
+          <div className={`${labelClass} mb-0.5`}>Collection per belt</div>
           <div className="font-medium flex items-center gap-1">
             {targetBuildingType && (
               <BuildingIcon buildingType={targetBuildingType as BuildingType} itemId={flatEdge.toItemId} size="sm" />
@@ -355,8 +336,8 @@ export const BlueprintEdge = memo(function BlueprintEdge({
       )}
       {!targetBuildingDist && (distribution || targetDistribution) && (
         <>
-          <div className={`border-t my-2 ${dividerClass}`} />
-          <div className={`${labelClass} mb-1`}>Distribution per belt</div>
+          <div className={`border-t my-1 ${dividerClass}`} />
+          <div className={`${labelClass} mb-0.5`}>Distribution per belt</div>
           {distribution && (
             <>
               <div className="font-medium flex items-center gap-1">
@@ -415,7 +396,7 @@ export const BlueprintEdge = memo(function BlueprintEdge({
 
         return (
           <>
-            <div className={`border-t my-2 ${dividerClass}`} />
+            <div className={`border-t my-1 ${dividerClass}`} />
             {splitterTree.isSplitterFriendly && splitterTree.steps.length > 0 ? (
               <>
                 <div className={`${labelClass} text-[11px] mb-1`}>Splitter Guide</div>

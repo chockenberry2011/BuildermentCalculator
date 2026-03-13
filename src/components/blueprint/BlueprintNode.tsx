@@ -249,7 +249,7 @@ function CompactNode({
 
   return (
     <div
-      className={`rounded-md shadow-md ${bgClass} ${borderClass} overflow-hidden`}
+      className={`rounded-md shadow-md ${bgClass} ${borderClass} overflow-hidden transition-transform hover:scale-[1.02]`}
       style={{
         width: 140,
         height: 40,
@@ -264,7 +264,7 @@ function CompactNode({
         ),
       }}
     >
-      <div className="h-0.5" style={{ backgroundColor: accentColor }} />
+      <div className="h-0.5" style={{ backgroundColor: accentColor, boxShadow: `0 1px 4px ${accentColor}33` }} />
       <div className="px-2 py-1 flex items-center gap-1.5 relative">
         <span className={`font-bold text-xs ${textColor} truncate flex-1`} title={flatNode.consumerItemName ? `${flatNode.itemName} \u2192 ${flatNode.consumerItemName}` : flatNode.itemName}>
           {flatNode.itemName}{flatNode.consumerItemName ? ` \u2192 ${flatNode.consumerItemName}` : ''}
@@ -343,7 +343,7 @@ function FullNode({
 
   return (
     <div
-      className={`rounded-lg shadow-lg ${bgClass} ${borderClass} min-w-[170px] max-w-[200px] overflow-hidden`}
+      className={`rounded-lg shadow-lg ${bgClass} ${borderClass} min-w-[170px] max-w-[200px] overflow-hidden transition-transform hover:scale-[1.02]`}
       style={building && building.level < building.configuredLevel
         ? {
             borderLeft: '3px solid #6366F1',
@@ -355,7 +355,8 @@ function FullNode({
       }
     >
       {/* Accent bar */}
-      <div className="h-1" style={{ backgroundColor: accentColor }} />
+      {/* Taller accent bar with gradient */}
+      <div className="h-1.5" style={{ background: `linear-gradient(90deg, ${accentColor}, ${accentColor}cc)` }} />
 
       <div className="px-3 py-2 relative">
         {/* Progress checkbox */}

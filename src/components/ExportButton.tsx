@@ -60,7 +60,8 @@ export function ExportButton() {
     <button
       onClick={handleExport}
       title="Copy to Clipboard"
-      className={`flex items-center gap-2 px-2 sm:px-4 py-2 rounded-lg transition text-sm ${
+      aria-label="Copy to clipboard"
+      className={`flex items-center gap-2 px-2 sm:px-4 py-2 rounded-lg active:scale-95 transition-[colors,transform] text-sm ${
         isDark
           ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
           : 'bg-gray-100 hover:bg-gray-200 text-gray-700'

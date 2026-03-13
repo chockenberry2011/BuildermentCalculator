@@ -15,6 +15,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { ExportButton } from './components/ExportButton';
 import { CollapsibleSection } from './components/CollapsibleSection';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { BadgePopover } from './components/BadgePopover';
 import { useStore } from './store/useStore';
 import { getItem } from './data/items';
 
@@ -27,7 +28,8 @@ function ResetButton() {
     <button
       onClick={resetCalculator}
       title="Reset Calculator"
-      className={`flex items-center gap-2 px-2 sm:px-4 py-2 rounded-lg transition text-sm ${
+      aria-label="Reset calculator"
+      className={`flex items-center gap-2 px-2 sm:px-4 py-2 rounded-lg active:scale-95 transition-[colors,transform] text-sm ${
         isDark
           ? 'bg-gray-700 hover:bg-gray-600 text-gray-200'
           : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
@@ -173,14 +175,40 @@ function AppContent() {
 
       {/* Header */}
       {!isFullscreen && (
-        <header className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b px-4 sm:px-6 py-3 sm:py-4`}>
+        <header className={`${isDark ? 'bg-gray-800/95 border-gray-700/50' : 'bg-white/95 border-gray-200'} border-b shadow-card backdrop-blur-sm px-4 sm:px-6 py-3 sm:py-4`}>
           <div className="max-w-6xl mx-auto flex flex-row items-center justify-between gap-4">
             <div>
               <h1 className={`text-xl sm:text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
                 Builderment Resource Calculator
-                <span className="ml-2 align-middle text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400 border border-amber-500/30 dark:border-amber-400/30" title="Under active development — things may change or break">
-                  BETA
-                </span>
+                <BadgePopover
+                  isDark={isDark}
+                  tooltipContent="Under active development"
+                  popoverContent={
+                    <div className="w-56 space-y-2">
+                      <p className={`text-xs font-medium ${isDark ? 'text-gray-200' : 'text-gray-900'}`}>
+                        Under active development
+                      </p>
+                      <p className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Things may change or break. Found a bug or have a suggestion?
+                      </p>
+                      <a
+                        href="https://github.com/chockenberry2011/BuildermentCalculator/issues"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-blue-500 hover:text-blue-400"
+                      >
+                        Submit feedback on GitHub
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    </div>
+                  }
+                >
+                  <span className="ml-2 align-middle text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400 border border-amber-500/30 dark:border-amber-400/30">
+                    BETA
+                  </span>
+                </BadgePopover>
               </h1>
               <p className={`hidden sm:block text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                 Map out your entire production chain — under active development
@@ -200,12 +228,12 @@ function AppContent() {
         {/* Zone 1: Constrained top */}
         {!isFullscreen && (
           <div className="max-w-6xl mx-auto px-3 sm:px-6">
-            <div ref={targetListRef} className={`group/sticky ${isDark ? 'bg-gray-800' : 'bg-white border border-gray-200'} rounded-lg p-2 sm:p-3 mb-4 sm:mb-6 shadow-sm`}>
+            <div ref={targetListRef} className={`group/sticky ${isDark ? 'bg-gray-800 border border-gray-700/50' : 'bg-white border border-gray-200'} rounded-card p-2 sm:p-3 mb-6 shadow-card`}>
               <TargetList />
             </div>
 
             {bestPracticalRates && (
-              <div className="mb-4 sm:mb-6">
+              <div className="mb-6">
                 <CollapsibleSection title="Optimal Rates" isOpen={!collapsedSections['Optimal Rates']} onToggle={() => toggleSection('Optimal Rates')}>
                   <OptimizationPanel />
                 </CollapsibleSection>
@@ -218,7 +246,7 @@ function AppContent() {
         <div className={
           isFullscreen
             ? `fixed inset-0 z-40 flex flex-col pt-10 ${isDark ? 'bg-gray-900' : 'bg-gray-100'}`
-            : 'max-w-6xl mx-auto px-3 sm:px-6 mb-4 sm:mb-6'
+            : 'max-w-6xl mx-auto px-3 sm:px-6 mb-6'
         }>
           <CollapsibleSection
             title="Production View"
@@ -234,15 +262,15 @@ function AppContent() {
 
         {/* Zone 3: Constrained bottom */}
         {!isFullscreen && (
-          <div className="max-w-6xl mx-auto px-3 sm:px-6 space-y-4 sm:space-y-6">
+          <div className="max-w-6xl mx-auto px-3 sm:px-6 space-y-6">
             {productionResult && (
               <CollapsibleSection title="Raw Resources" subtitle="Total resources needed from the map" isOpen={!collapsedSections['Raw Resources']} onToggle={() => toggleSection('Raw Resources')}>
                 <SummaryTable />
               </CollapsibleSection>
             )}
 
-            <div className="lg:grid lg:grid-cols-2 lg:gap-6 space-y-2 sm:space-y-4 lg:space-y-0">
-              <div className="space-y-2 sm:space-y-4">
+            <div className="lg:grid lg:grid-cols-2 lg:gap-6 space-y-6 lg:space-y-0">
+              <div className="space-y-6">
                 <CollapsibleSection title="Extractors" subtitle="Extractors needed for current production" isOpen={!collapsedSections['Extractors']} onToggle={() => toggleSection('Extractors')}>
                   <ResourceInput />
                 </CollapsibleSection>
@@ -252,7 +280,7 @@ function AppContent() {
                 </CollapsibleSection>
               </div>
 
-              <div className="space-y-2 sm:space-y-4">
+              <div className="space-y-6">
                 <CollapsibleSection title="Recipes" subtitle="Choose alternate recipes for items" isOpen={!collapsedSections['Recipes']} onToggle={() => toggleSection('Recipes')}>
                   <RecipePickerList />
                 </CollapsibleSection>

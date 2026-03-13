@@ -15,7 +15,7 @@ describe('computeWiringLayout', () => {
     expect(layout.mergeZone!.buildings[0].x).toBeGreaterThan(layout.belts[0].endX);
     // Layout dimensions
     expect(layout.width).toBeGreaterThan(0);
-    expect(layout.height).toBe(56); // 2 belts × 28px spacing
+    expect(layout.height).toBe(80); // 2 belts × 40px spacing
   });
 
   it('6 buildings / 2 belts → 3 full per belt, 0 shared, no merge zone', () => {
@@ -33,7 +33,7 @@ describe('computeWiringLayout', () => {
     expect(layout.mergeZone).not.toBeNull();
     expect(layout.mergeZone!.buildings).toHaveLength(2);
     expect(layout.mergeZone!.buildings.every(b => b.isShared)).toBe(true);
-    expect(layout.height).toBe(84); // 3 belts × 28px spacing
+    expect(layout.height).toBe(120); // 3 belts × 40px spacing
   });
 
   it('large count compression: 20 buildings / 2 belts → compressed rows', () => {
@@ -47,9 +47,9 @@ describe('computeWiringLayout', () => {
 
   it('belt y positions are evenly spaced', () => {
     const layout = computeWiringLayout(9, 3, 3, 0);
-    expect(layout.belts[0].y).toBe(14);
-    expect(layout.belts[1].y).toBe(42);
-    expect(layout.belts[2].y).toBe(70);
+    expect(layout.belts[0].y).toBe(20);  // 40/2
+    expect(layout.belts[1].y).toBe(60);  // 40/2 + 40
+    expect(layout.belts[2].y).toBe(100); // 40/2 + 80
   });
 });
 

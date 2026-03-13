@@ -37,7 +37,11 @@ export function SummaryTable() {
             return (
               <div
                 key={itemId}
-                className={`flex items-center gap-1.5 py-0.5 ${isConstraint ? (isDark ? 'bg-blue-900/30' : 'bg-blue-50') + ' rounded px-1 -mx-1' : ''}`}
+                className={`flex items-center gap-1.5 py-1 px-1 -mx-1 rounded-md transition-colors ${
+                  isConstraint
+                    ? isDark ? 'bg-blue-900/30' : 'bg-blue-50'
+                    : isDark ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'
+                }`}
               >
                 <ResourceIcon resourceId={itemId} />
                 <span className={`flex-1 min-w-0 truncate text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>

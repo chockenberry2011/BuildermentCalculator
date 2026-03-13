@@ -193,6 +193,21 @@ const ICON_COMPONENTS: Record<BuildingType, React.FC<{ color: string }>> = {
   earth_teleporter: IconEarthTeleporter,
 };
 
+/**
+ * Renders a building icon shape directly inside an existing SVG element.
+ * Used by WiringDiagram to embed icons in building rectangles.
+ */
+export function BuildingIconSvg({ buildingType, x, y, size }: { buildingType: BuildingType; x: number; y: number; size: number }) {
+  const IconComponent = ICON_COMPONENTS[buildingType];
+  if (!IconComponent) return null;
+  const scale = size / 16;
+  return (
+    <g transform={`translate(${x}, ${y}) scale(${scale})`}>
+      <IconComponent color="rgba(255,255,255,0.85)" />
+    </g>
+  );
+}
+
 export function BuildingIcon({ buildingType, itemId, size = 'sm', className = '' }: BuildingIconProps) {
   const color = (buildingType === 'extractor' && itemId && EXTRACTOR_COLORS[itemId])
     ? EXTRACTOR_COLORS[itemId]

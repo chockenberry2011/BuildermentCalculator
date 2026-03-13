@@ -2,6 +2,17 @@ import { useStore } from '../store/useStore';
 import { BuildingLevelConfig } from './BuildingLevelConfig';
 import { BeltConfig } from './BeltConfig';
 
+function SectionLabel({ label, isDark }: { label: string; isDark: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+        {label}
+      </span>
+      <div className={`flex-1 h-px ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`} />
+    </div>
+  );
+}
+
 export function SettingsSection() {
   const theme = useStore((s) => s.theme);
   const worldGen2 = useStore((s) => s.worldGen2);
@@ -39,9 +50,9 @@ export function SettingsSection() {
           </span>
         </span>
       </button>
-      <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`} />
+      <SectionLabel label="Building Levels" isDark={isDark} />
       <BuildingLevelConfig />
-      <div className={`border-t ${isDark ? 'border-gray-700' : 'border-gray-200'}`} />
+      <SectionLabel label="Belt Speed" isDark={isDark} />
       <BeltConfig />
     </div>
   );

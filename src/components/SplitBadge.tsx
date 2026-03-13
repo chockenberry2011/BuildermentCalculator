@@ -103,18 +103,20 @@ export function SplitBadge({ count, variant = 'pill', isDark = false, autoRegula
         <span className="font-medium" style={{ color: qualityColor }}>{qualityLabel}</span>
       </div>
       <div className={`border-t my-2 ${dividerClass}`} />
-      <div className={`text-xs ${labelClass}`}>
-        <div className="flex items-center gap-1 mb-1">
-          <SplitIcon size={10} color="currentColor" />
-          <span className="font-medium">Use a 1:{info.splitDenominator} splitter</span>
+      <div className={`rounded-md px-2 py-1.5 ${isDark ? 'bg-blue-900/30 border border-blue-800/50' : 'bg-blue-50 border border-blue-200'}`}>
+        <div className="flex items-center gap-1.5">
+          <SplitIcon size={12} color={isDark ? '#60A5FA' : '#3B82F6'} />
+          <span className={`font-semibold text-xs ${isDark ? 'text-blue-300' : 'text-blue-700'}`}>
+            Use a 1:{info.splitDenominator} splitter
+          </span>
         </div>
         {info.splitNumerator > 1 && (
-          <div className="italic">
+          <div className={`text-xs mt-0.5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
             Route {info.splitNumerator} of {info.splitDenominator} outputs to partial building
           </div>
         )}
         {isPowerOf2(info.splitDenominator) && info.splitDenominator > 2 && (
-          <div className="italic">
+          <div className={`text-xs mt-0.5 ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
             Cascade {Math.log2(info.splitDenominator)} stages of 1:2 splitters
           </div>
         )}

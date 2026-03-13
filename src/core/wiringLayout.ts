@@ -30,11 +30,11 @@ export interface CompressedRow {
   ellipsisX: number;
 }
 
-const BUILDING_START_X = 36;
-const BUILDING_SIZE = 16;
-const BUILDING_GAP = 4;
-const BELT_SPACING = 28;
-const MERGE_GAP = 12;
+const BUILDING_START_X = 44;
+const BUILDING_SIZE = 24;
+const BUILDING_GAP = 8;
+const BELT_SPACING = 40;
+const MERGE_GAP = 16;
 const COMPRESS_THRESHOLD = 6;
 
 /**

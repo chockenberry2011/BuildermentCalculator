@@ -214,9 +214,14 @@ function RateCard({
 
   return (
     <div
-      className={`p-2 sm:p-2.5 rounded-lg border ${
+      className={`p-2 sm:p-2.5 rounded-lg border transition-all ${
         isCardActive ? colors.active[mode] : colors.inactive[mode]
       }`}
+      style={{
+        backgroundImage: isCardActive
+          ? `linear-gradient(135deg, ${colorScheme === 'green' ? 'rgba(34,197,94,0.05)' : 'rgba(245,158,11,0.05)'}, transparent)`
+          : undefined,
+      }}
     >
       {/* Mobile: compact stacked layout | Desktop: horizontal layout */}
 
@@ -246,7 +251,7 @@ function RateCard({
                 onApply();
               }
             }}
-            className={`hidden sm:inline text-xs px-3 py-1 rounded transition font-medium flex-shrink-0 ${colors.button[mode]}`}
+            className={`hidden sm:inline text-xs px-3 py-1 rounded transition font-medium flex-shrink-0 hover:scale-[1.02] ${colors.button[mode]}`}
           >
             Apply{selectedDoubling ? ` ${formatRate(selectedDoubling.rate)}/min` : ''}
           </button>
@@ -304,7 +309,7 @@ function RateCard({
                 onApply();
               }
             }}
-            className={`text-xs px-3 py-1 rounded transition font-medium w-full ${colors.button[mode]}`}
+            className={`text-xs px-3 py-1 rounded transition font-medium w-full hover:scale-[1.02] ${colors.button[mode]}`}
           >
             Apply{selectedDoubling ? ` ${formatRate(selectedDoubling.rate)}/min` : ''}
           </button>

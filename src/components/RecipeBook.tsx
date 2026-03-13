@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { ALL_RECIPES, Recipe } from '../data/recipes';
 import { ITEMS } from '../data/items';
 import { BUILDINGS, BuildingType, getExtractorRates } from '../data/buildings';
+import { getItemColor } from '../data/itemColors';
 import { useStore } from '../store/useStore';
 
 function getOutputRate(recipe: Recipe, level: number): number {
@@ -32,12 +33,14 @@ function RecipeCard({ recipe, currentLevel, isDark }: RecipeCardProps) {
   const building = BUILDINGS[recipe.building];
   const maxLevel = building.maxLevel;
   const outputRate = getOutputRate(recipe, currentLevel);
+  const itemColor = getItemColor(recipe.outputId);
 
   return (
     <div
-      className={`rounded-md px-3 py-2 text-xs cursor-pointer ${
+      className={`rounded-md px-3 py-2 text-xs cursor-pointer transition-colors ${
         isDark ? 'bg-gray-700/50 hover:bg-gray-700' : 'bg-gray-50 hover:bg-gray-100'
       }`}
+      style={{ borderLeft: `3px solid ${itemColor}` }}
       onClick={() => setExpanded(!expanded)}
     >
       {/* Header: item name + building */}

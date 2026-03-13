@@ -184,66 +184,45 @@ function InputDetailPanel({ detail, isDark }: { detail: EdgeDetail; isDark: bool
 
   return (
     <div className={`${panelBg} rounded-md px-2.5 py-2 mt-1 space-y-1.5 text-xs ${textClass}`}>
-      {/* Belt info */}
-      <div className="flex justify-between">
-        <span className={labelClass}>Throughput</span>
-        <span className="font-medium">{formatRateNum(detail.rate)}/min</span>
-      </div>
+      {/* Rate */}
+      <div className="font-medium">{formatRateNum(detail.rate)}/min · {utilizationPct}%</div>
 
       {shareText && sourceBuildingName && (
         <>
           <div className={`border-t my-1.5 ${dividerClass}`} />
           <div className={`${labelClass} text-[11px]`}>Source</div>
-          <div className="flex justify-between items-center">
-            <span className={labelClass}>{sourceIsRaw ? 'Extractors' : sourceBuildingName + 's'}</span>
-            <span className="font-medium flex items-center gap-1">
-              {sourceBuildingType && (
-                <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={detail.sourceItemId} size="sm" />
-              )}
-              {shareText} of {detail.sourceBuildingCount
-                ? (detail.sourceBuildingCount.isInteger() ? Math.round(detail.sourceBuildingCount.toNumber()).toString() : detail.sourceBuildingCount.toNumber().toFixed(2))
-                : '?'}
-              {sourceIsRaw && detail.sourceBuildingLevel !== null && detail.sourceBuildingLevel > 1 && (
-                <span className={`text-[10px] font-medium px-1 py-0.5 rounded ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
-                  Lv{detail.sourceBuildingLevel}
-                </span>
-              )}
-            </span>
+          <div className="font-medium flex items-center gap-1">
+            {sourceBuildingType && (
+              <BuildingIcon buildingType={sourceBuildingType as BuildingType} itemId={detail.sourceItemId} size="sm" />
+            )}
+            {shareText} of {detail.sourceBuildingCount
+              ? (detail.sourceBuildingCount.isInteger() ? Math.round(detail.sourceBuildingCount.toNumber()).toString() : detail.sourceBuildingCount.toNumber().toFixed(2))
+              : '?'} {sourceIsRaw ? 'extractors' : sourceBuildingName.toLowerCase() + 's'}
+            {sourceIsRaw && detail.sourceBuildingLevel !== null && detail.sourceBuildingLevel > 1 && (
+              <span className={`text-[10px] font-medium px-1 py-0.5 rounded ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
+                Lv{detail.sourceBuildingLevel}
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5">
+            <span className={labelClass}>→</span> <span className="font-medium">{edge.toItemName}</span>
           </div>
         </>
       )}
 
       <div className={`border-t my-1.5 ${dividerClass}`} />
-      <div className="flex justify-between">
-        <span className={labelClass}>Belts needed</span>
-        <span className="font-medium flex items-center gap-1">
-          <BeltIcon size={12} color={statusColor} />
-          {beltsNeeded}
-        </span>
-      </div>
-      {physicalBeltInfo && physicalBeltInfo.physicalBelts > physicalBeltInfo.throughputBelts && (
-        <div className="flex justify-between">
-          <span className={labelClass}>Belt capacity</span>
-          <span className="font-medium">{physicalBeltInfo.throughputBelts} (throughput)</span>
-        </div>
-      )}
-      <div className="flex justify-between">
-        <span className={labelClass}>Utilization</span>
-        <span className="font-medium">{utilizationPct}%</span>
+      <div className="font-medium">
+        ×{beltsNeeded}
+        {beltStatus !== 'ok'
+          ? <> · <span style={{ color: statusColor }}>{beltStatus === 'multi-belt' ? 'multi-belt' : 'near capacity'}</span></>
+          : <> · {utilizationPct}%</>
+        }
       </div>
       {perBeltRate !== null && (
-        <div className="flex justify-between">
-          <span className={labelClass}>Per belt</span>
-          <span className="font-medium">{formatRateNum(perBeltRate)}/min</span>
-        </div>
+        <div className="mt-0.5">{formatRateNum(perBeltRate)}/min per belt</div>
       )}
-      {beltStatus !== 'ok' && (
-        <div className="flex justify-between">
-          <span className={labelClass}>Status</span>
-          <span className="font-medium" style={{ color: statusColor }}>
-            {beltStatus === 'multi-belt' ? 'Multi-belt' : 'Near capacity'}
-          </span>
-        </div>
+      {physicalBeltInfo && physicalBeltInfo.physicalBelts > physicalBeltInfo.throughputBelts && (
+        <div className="mt-0.5">{physicalBeltInfo.throughputBelts} throughput</div>
       )}
 
       {/* Distribution */}
@@ -513,6 +492,7 @@ function MobileCard({
   isRoot,
   progressState,
   onToggleProgress,
+  outboundBelts,
 }: {
   node: FlatNode;
   edgeDetails: EdgeDetail[];
@@ -520,6 +500,7 @@ function MobileCard({
   isRoot: boolean;
   progressState: BlueprintProgressState | false;
   onToggleProgress: () => void;
+  outboundBelts: number;
 }) {
   const accentColor = getItemColor(node.itemId);
   const building = node.building;
@@ -576,6 +557,12 @@ function MobileCard({
             {building && building.level > 1 && (
               <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${isDark ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'}`}>
                 Lv{building.level}
+              </span>
+            )}
+            {outboundBelts > 0 && (
+              <span className={`flex items-center gap-0.5 text-[10px] ${subtextColor}`}>
+                <BeltIcon size={10} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                ×{outboundBelts}
               </span>
             )}
             <div className="flex-1" />
@@ -639,6 +626,30 @@ export function MobileCardView({
 
   // Compute enriched edge details
   const edgeDetailsOf = useMemo(() => computeEdgeDetails(dag, beltSpeed), [dag, beltSpeed]);
+
+  // Compute total outbound belts per node
+  // For nodes with no outbound edges (final products), use their output rate
+  const outboundBeltsOf = useMemo(() => {
+    const result = new Map<string, number>();
+    const hasOutbound = new Set<string>();
+    for (const details of edgeDetailsOf.values()) {
+      for (const d of details) {
+        const key = d.edge.fromNodeKey;
+        hasOutbound.add(key);
+        result.set(key, (result.get(key) ?? 0) + d.beltsNeeded);
+      }
+    }
+    // Final products: belts needed to carry their output
+    for (const node of dag.nodes) {
+      if (!hasOutbound.has(node.nodeKey)) {
+        const rate = node.totalRate.toNumber();
+        if (rate > 0) {
+          result.set(node.nodeKey, getBeltsNeeded(rate, beltSpeed));
+        }
+      }
+    }
+    return result;
+  }, [edgeDetailsOf, dag.nodes, beltSpeed]);
 
   // Group nodes by rank (descending: final products first)
   const groupedNodes = useMemo(() => {
@@ -775,6 +786,7 @@ export function MobileCardView({
                   isRoot={rootItemIds.has(node.itemId)}
                   progressState={blueprintProgress.get(node.nodeKey) ?? false}
                   onToggleProgress={() => toggleBlueprintProgress(node.nodeKey)}
+                  outboundBelts={outboundBeltsOf.get(node.nodeKey) ?? 0}
                 />
               ))}
             </div>
