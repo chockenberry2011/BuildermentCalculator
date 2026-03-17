@@ -778,9 +778,4 @@ if (typeof window !== 'undefined') {
       worldGen2: state.worldGen2,
     });
   });
-
-  // Initialize calculation on first load
-  setTimeout(() => {
-    useStore.getState().recalculate();
-  }, 0);
 }

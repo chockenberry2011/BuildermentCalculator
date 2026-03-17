@@ -1,4 +1,5 @@
 import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 import { BuildingLevelConfig } from './BuildingLevelConfig';
 import { BeltConfig } from './BeltConfig';
 
@@ -14,10 +15,9 @@ function SectionLabel({ label, isDark }: { label: string; isDark: boolean }) {
 }
 
 export function SettingsSection() {
-  const theme = useStore((s) => s.theme);
   const worldGen2 = useStore((s) => s.worldGen2);
   const setWorldGen2 = useStore((s) => s.setWorldGen2);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   return (
     <div className="space-y-3">

@@ -1,4 +1,5 @@
 import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 import { ItemSelector } from './ItemSelector';
 import { RateInput } from './RateInput';
 
@@ -7,8 +8,7 @@ export function TargetList() {
   const addTarget = useStore((s) => s.addTarget);
   const removeTarget = useStore((s) => s.removeTarget);
   const updateTarget = useStore((s) => s.updateTarget);
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   const isSingleTarget = targets.length === 1;
 

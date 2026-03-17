@@ -3,6 +3,7 @@ import { isPowerOf2, lcmMultiple, isEffectivelyInteger, gcdMultiple } from './ma
 import { Rational } from './math/rational';
 import { BuildingType, EXTRACTOR_RATES } from '../data/buildings';
 import { isCleanBeltMultiple } from '../data/belts';
+import { collectThroughputs } from './treeUtils';
 
 // ============================================================================
 // Extractor cost computation
@@ -128,10 +129,6 @@ export interface OptimizationCandidate {
   // Non-clean belt metrics (need splitters to distribute)
   nonCleanBeltCount: number;    // Number of connections that need fractional belts
   hasNonCleanBelts: boolean;    // True if ANY connection needs splitters
-  /** @deprecated Use nonCleanBeltCount instead */
-  overfilledBeltCount: number;
-  /** @deprecated Use hasNonCleanBelts instead */
-  hasOverfilledBelts: boolean;
 }
 
 /**
@@ -229,23 +226,6 @@ export function findOptimalScales(
 }
 
 /**
- * Collect all throughputs at scale=1 from the production tree.
- */
-function collectThroughputs(result: ProductionResult): number[] {
-  const throughputs: number[] = [];
-
-  function processNode(node: typeof result.root) {
-    for (const child of node.children) {
-      throughputs.push(child.ratePerMinute.toNumber());
-      processNode(child);
-    }
-  }
-
-  processNode(result.root);
-  return throughputs;
-}
-
-/**
  * Compute rational building counts for a given scale.
  * Uses exact Rational arithmetic to preserve fraction information.
  */
@@ -325,9 +305,6 @@ export function evaluateScale(
     allBeltsClean,
     nonCleanBeltCount,
     hasNonCleanBelts,
-    // Deprecated aliases for backward compatibility
-    overfilledBeltCount: nonCleanBeltCount,
-    hasOverfilledBelts: hasNonCleanBelts,
   };
 }
 

@@ -2,6 +2,7 @@ import { ProductionResult } from './ProductionCalculator';
 import { BuildingType, EXTRACTOR_RATES } from '../data/buildings';
 import { evaluateScale, findMinIntegerScale } from './RatioOptimizer';
 import { isPowerOf2 } from './math/gcd';
+import { collectThroughputs } from './treeUtils';
 
 export interface PracticalCandidate {
   rate: number;
@@ -215,21 +216,4 @@ export function findPracticalRates(
     maxAchievableRate,
     totalExtractorsAtRate1,
   };
-}
-
-/**
- * Collect all throughputs at scale=1 from the production tree.
- */
-function collectThroughputs(result: ProductionResult): number[] {
-  const throughputs: number[] = [];
-
-  function processNode(node: typeof result.root) {
-    for (const child of node.children) {
-      throughputs.push(child.ratePerMinute.toNumber());
-      processNode(child);
-    }
-  }
-
-  processNode(result.root);
-  return throughputs;
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 
 interface RateInputProps {
   value?: number;
@@ -10,8 +11,7 @@ export function RateInput({ value, onChange }: RateInputProps) {
   const storeRate = useStore((s) => s.targetRate);
   const storeSetRate = useStore((s) => s.setTargetRate);
   const constraintSource = useStore((s) => s.constraintSource);
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   const rate = value ?? storeRate;
   const commitRate = onChange ?? storeSetRate;

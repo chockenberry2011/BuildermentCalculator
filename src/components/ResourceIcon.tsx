@@ -2,6 +2,7 @@
  * Compact SVG icons for raw resources.
  */
 
+import { memo } from 'react';
 import { EXTRACTOR_COLORS } from './BuildingIcon';
 import { getItemColor } from '../data/itemColors';
 
@@ -85,7 +86,7 @@ interface ResourceIconProps {
   className?: string;
 }
 
-export function ResourceIcon({ resourceId, className = '' }: ResourceIconProps) {
+export const ResourceIcon = memo(function ResourceIcon({ resourceId, className = '' }: ResourceIconProps) {
   const IconComponent = ICON_COMPONENTS[resourceId];
   if (!IconComponent) return null;
 
@@ -102,4 +103,4 @@ export function ResourceIcon({ resourceId, className = '' }: ResourceIconProps) 
       <IconComponent color={color} />
     </svg>
   );
-}
+});

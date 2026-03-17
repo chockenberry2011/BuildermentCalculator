@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 
 interface CollapsibleSectionProps {
   title: string;
@@ -24,8 +24,7 @@ export function CollapsibleSection({
   className,
   contentClassName,
 }: CollapsibleSectionProps) {
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
 
   const isControlled = controlledIsOpen !== undefined;

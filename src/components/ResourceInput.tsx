@@ -1,4 +1,5 @@
 import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 import { ITEMS } from '../data/items';
 import { getExtractorRates } from '../data/buildings';
 import { StepperButton } from './StepperButton';
@@ -10,8 +11,7 @@ export function ResourceInput() {
   const constraintSource = useStore((s) => s.constraintSource);
   const buildingLevels = useStore((s) => s.buildingLevels);
   const worldGen2 = useStore((s) => s.worldGen2);
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   const extractorLevel = buildingLevels.get('extractor') ?? 1;
   const ratePerExtractor = getExtractorRates(worldGen2)[extractorLevel - 1];

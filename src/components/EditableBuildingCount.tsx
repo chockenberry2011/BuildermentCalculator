@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Rational } from '../core/math/rational';
 import { fractionSimplicityScore } from '../core/RatioOptimizer';
 import { getCountColor } from '../core/countColor';
@@ -21,11 +21,8 @@ export function EditableBuildingCount({ count, isConstraint, onSetCount, isDark 
   const score = fractionSimplicityScore(count);
   const color = getCountColor(score, isDark);
 
-  useEffect(() => {
-    if (!isFocused) {
-      setEditValue(isInteger ? Math.round(value).toString() : value.toFixed(2));
-    }
-  }, [value, isInteger, isFocused]);
+  // Derive the shown value: when not focused, always show the prop value
+  const shownValue = isFocused ? editValue : displayValue;
 
   const handleConfirm = () => {
     const newCount = parseFloat(editValue);
@@ -56,9 +53,9 @@ export function EditableBuildingCount({ count, isConstraint, onSetCount, isDark 
       <StepperButton direction="decrement" onClick={() => step(-1)} isDark={isDark} />
       <input
         type="number"
-        value={editValue}
+        value={shownValue}
         onChange={(e) => setEditValue(e.target.value)}
-        onFocus={(e) => { setIsFocused(true); e.target.select(); }}
+        onFocus={(e) => { setEditValue(displayValue); setIsFocused(true); e.target.select(); }}
         onBlur={handleConfirm}
         onKeyDown={handleKeyDown}
         style={{ color }}

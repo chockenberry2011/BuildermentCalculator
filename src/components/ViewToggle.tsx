@@ -1,10 +1,10 @@
 import { useStore, ViewMode } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 
 export function ViewToggle() {
   const viewMode = useStore((s) => s.viewMode);
   const setViewMode = useStore((s) => s.setViewMode);
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   const modes: { id: ViewMode; label: string }[] = [
     { id: 'tree', label: 'Tree' },

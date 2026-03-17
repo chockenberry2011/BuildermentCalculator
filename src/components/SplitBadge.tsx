@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Rational } from '../core/math/rational';
 import { getSplitInfo } from '../core/splitInfo';
 import { fractionSimplicityScore } from '../core/RatioOptimizer';
@@ -39,7 +40,7 @@ interface SplitBadgeProps {
   autoRegulated?: boolean;
 }
 
-export function SplitBadge({ count, variant = 'pill', isDark = false, autoRegulated = false }: SplitBadgeProps) {
+export const SplitBadge = memo(function SplitBadge({ count, variant = 'pill', isDark = false, autoRegulated = false }: SplitBadgeProps) {
   const info = getSplitInfo(count);
   if (!info) return null;
 
@@ -176,4 +177,4 @@ export function SplitBadge({ count, variant = 'pill', isDark = false, autoRegula
       {pill}
     </BadgePopover>
   );
-}
+});

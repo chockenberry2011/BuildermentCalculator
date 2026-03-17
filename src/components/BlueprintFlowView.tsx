@@ -16,6 +16,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useStore, type BlueprintOrientation, type BlueprintMergeMode, type BlueprintProgressState } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 import { flattenToDAG, layoutDAG, type FlatDAG, type FlatNode } from '../core/GraphFlattener';
 import { BlueprintNode, type BlueprintNodeData, type NodeInputInfo } from './blueprint/BlueprintNode';
 import { BlueprintEdge, type BlueprintEdgeData } from './blueprint/BlueprintEdge';
@@ -745,14 +746,14 @@ function BlueprintFlowInner({
 export function BlueprintFlowView({ isFullscreen }: { isFullscreen?: boolean } = {}) {
   const productionResult = useStore((s) => s.productionResult);
   const beltSpeed = useStore((s) => s.beltSpeed);
-  const theme = useStore((s) => s.theme);
   const targetItemId = useStore((s) => s.targetItemId);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
-  const [isSmallScreen, setIsSmallScreen] = useState(false);
+  const [isSmallScreen, setIsSmallScreen] = useState(
+    () => window.matchMedia('(max-width: 639px)').matches
+  );
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)');
-    setIsSmallScreen(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsSmallScreen(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);

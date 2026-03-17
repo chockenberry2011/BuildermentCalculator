@@ -1,10 +1,12 @@
+import { memo } from 'react';
+
 interface BeltIconProps {
   color?: string;
   size?: number;
   className?: string;
 }
 
-export function BeltIcon({ color = 'currentColor', size = 12, className = '' }: BeltIconProps) {
+export const BeltIcon = memo(function BeltIcon({ color = 'currentColor', size = 12, className = '' }: BeltIconProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -25,4 +27,4 @@ export function BeltIcon({ color = 'currentColor', size = 12, className = '' }: 
       <path d="M7 6.5L9.5 8L7 9.5Z" fill={color} />
     </svg>
   );
-}
+});

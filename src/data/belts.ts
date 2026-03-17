@@ -83,12 +83,3 @@ export function requiresFractionalBelts(throughput: number, beltSpeed: number): 
   if (throughput <= 0) return false;
   return !isCleanBeltMultiple(throughput, beltSpeed);
 }
-
-/**
- * @deprecated Use requiresFractionalBelts instead. This name was misleading.
- * "Overfilled" implied exceeding capacity, but this actually checks for
- * fractional belt usage (not a clean multiple).
- */
-export function isBeltOverfilled(throughput: number, beltSpeed: number): boolean {
-  return requiresFractionalBelts(throughput, beltSpeed);
-}

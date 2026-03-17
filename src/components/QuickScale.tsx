@@ -1,10 +1,10 @@
 import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 
 export function QuickScale() {
   const targetRate = useStore((s) => s.targetRate);
   const setTargetRate = useStore((s) => s.setTargetRate);
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   const handleScale = (multiplier: number) => {
     setTargetRate(targetRate * multiplier);

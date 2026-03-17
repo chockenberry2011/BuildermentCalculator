@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { BuildingRequirement } from '../core/ProductionCalculator';
 import { BUILDINGS } from '../data/buildings';
 import { BadgePopover } from './BadgePopover';
@@ -31,7 +32,7 @@ interface LevelBadgeProps {
   isDark?: boolean;
 }
 
-export function LevelBadge({ building, isDark = false }: LevelBadgeProps) {
+export const LevelBadge = memo(function LevelBadge({ building, isDark = false }: LevelBadgeProps) {
   if (building.level >= building.configuredLevel) return null;
 
   const buildingName = BUILDINGS[building.buildingType]?.name ?? building.buildingType;
@@ -83,4 +84,4 @@ export function LevelBadge({ building, isDark = false }: LevelBadgeProps) {
       {pill}
     </BadgePopover>
   );
-}
+});

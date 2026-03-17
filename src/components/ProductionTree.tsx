@@ -3,6 +3,7 @@ import { ProductionNode } from '../core/ProductionCalculator';
 import { BUILDINGS } from '../data/buildings';
 import { getItemColor } from '../data/itemColors';
 import { useStore, type BlueprintProgressState } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 import { BeltCalculationResult } from '../core/BeltCalculator';
 import { BuildingIcon } from './BuildingIcon';
 import { BeltBadge } from './BeltBadge';
@@ -338,17 +339,17 @@ export function ProductionTree() {
   const productionResult = useStore((s) => s.productionResult);
   const beltResult = useStore((s) => s.beltResult);
   const targetRate = useStore((s) => s.targetRate);
-  const theme = useStore((s) => s.theme);
   const setRateFromItemBuildingCount = useStore((s) => s.setRateFromItemBuildingCount);
   const constraintSource = useStore((s) => s.constraintSource);
   const blueprintProgress = useStore((s) => s.blueprintProgress);
   const setBlueprintProgressState = useStore((s) => s.setBlueprintProgressState);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
-  const [isSmallScreen, setIsSmallScreen] = useState(false);
+  const [isSmallScreen, setIsSmallScreen] = useState(
+    () => window.matchMedia('(max-width: 639px)').matches
+  );
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 639px)');
-    setIsSmallScreen(mq.matches);
     const handler = (e: MediaQueryListEvent) => setIsSmallScreen(e.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);

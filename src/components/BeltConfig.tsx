@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 
 export function BeltConfig() {
   const beltSpeed = useStore((s) => s.beltSpeed);
   const showBeltInfo = useStore((s) => s.showBeltInfo);
   const setBeltSpeed = useStore((s) => s.setBeltSpeed);
   const toggleBeltInfo = useStore((s) => s.toggleBeltInfo);
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   const [inputValue, setInputValue] = useState(beltSpeed.toString());
 

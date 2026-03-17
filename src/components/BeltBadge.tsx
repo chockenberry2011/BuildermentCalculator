@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { BeltConnection } from '../core/BeltCalculator';
 import { Rational } from '../core/math/rational';
 import { getBeltDistribution } from '../core/beltDistribution';
@@ -10,7 +11,7 @@ interface BeltBadgeProps {
   isDark: boolean;
 }
 
-export function BeltBadge({ beltConnection, buildingCount, isDark }: BeltBadgeProps) {
+export const BeltBadge = memo(function BeltBadge({ beltConnection, buildingCount, isDark }: BeltBadgeProps) {
   const { status, beltsNeeded, utilization, throughputPerMinute } = beltConnection;
 
   // Only render for multi-belt or near-capacity (not 'ok')
@@ -97,4 +98,4 @@ export function BeltBadge({ beltConnection, buildingCount, isDark }: BeltBadgePr
       {pill}
     </BadgePopover>
   );
-}
+});

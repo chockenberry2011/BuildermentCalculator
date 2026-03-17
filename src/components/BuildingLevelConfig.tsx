@@ -1,13 +1,13 @@
 import { BuildingType } from '../data/buildings';
 import { BUILDINGS } from '../data/buildings';
 import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 import { BuildingIcon } from './BuildingIcon';
 
 export function BuildingLevelConfig() {
   const buildingLevels = useStore((s) => s.buildingLevels);
   const setBuildingLevel = useStore((s) => s.setBuildingLevel);
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   const relevantBuildings: BuildingType[] = [
     'extractor',

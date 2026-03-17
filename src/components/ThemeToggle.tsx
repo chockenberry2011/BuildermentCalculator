@@ -1,9 +1,9 @@
 import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 
 export function ThemeToggle() {
-  const theme = useStore((s) => s.theme);
   const toggleTheme = useStore((s) => s.toggleTheme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   return (
     <button

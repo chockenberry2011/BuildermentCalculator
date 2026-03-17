@@ -2,6 +2,7 @@ import { getRecipesForItem, hasAlternateRecipes, Recipe } from '../data/recipes'
 import { ITEMS } from '../data/items';
 import { BUILDINGS } from '../data/buildings';
 import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 
 interface RecipePickerProps {
   itemId: string;
@@ -24,8 +25,7 @@ function RecipeDetails({ recipe, isDark }: { recipe: Recipe; isDark: boolean }) 
 export function RecipePicker({ itemId }: RecipePickerProps) {
   const recipeSelections = useStore((s) => s.recipeSelections);
   const setRecipeSelection = useStore((s) => s.setRecipeSelection);
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   if (!hasAlternateRecipes(itemId)) {
     return null;
@@ -67,8 +67,7 @@ export function RecipePicker({ itemId }: RecipePickerProps) {
 
 export function RecipePickerList() {
   const productionResult = useStore((s) => s.productionResult);
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   if (!productionResult) return null;
 

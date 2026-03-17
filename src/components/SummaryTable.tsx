@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ITEMS } from '../data/items';
 import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 import { ResourceIcon } from './ResourceIcon';
 import { StepperButton } from './StepperButton';
 
@@ -11,8 +12,7 @@ export function SummaryTable() {
   const showBeltInfo = useStore((s) => s.showBeltInfo);
   const setRateFromResourceAmount = useStore((s) => s.setRateFromResourceAmount);
   const constraintSource = useStore((s) => s.constraintSource);
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   if (!productionResult) {
     return null;
@@ -177,11 +177,8 @@ function EditableResourceRate({ rate, isConstraint, onSetRate, isDark }: Editabl
   const [editValue, setEditValue] = useState(displayValue);
   const [isFocused, setIsFocused] = useState(false);
 
-  useEffect(() => {
-    if (!isFocused) {
-      setEditValue(rate.toFixed(2));
-    }
-  }, [rate, isFocused]);
+  // Derive the shown value: when not focused, always show the prop value
+  const shownValue = isFocused ? editValue : displayValue;
 
   const handleConfirm = () => {
     const newRate = parseFloat(editValue);
@@ -212,9 +209,9 @@ function EditableResourceRate({ rate, isConstraint, onSetRate, isDark }: Editabl
       <StepperButton direction="decrement" onClick={() => step(-1)} isDark={isDark} />
       <input
         type="number"
-        value={editValue}
+        value={shownValue}
         onChange={(e) => setEditValue(e.target.value)}
-        onFocus={(e) => { setIsFocused(true); e.target.select(); }}
+        onFocus={(e) => { setEditValue(displayValue); setIsFocused(true); e.target.select(); }}
         onBlur={handleConfirm}
         onKeyDown={handleKeyDown}
         className={`w-16 h-5 px-0 text-center font-mono text-sm bg-transparent border-none outline-none ${

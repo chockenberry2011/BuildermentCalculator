@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { BuildingType, BUILDINGS } from '../data/buildings';
 
 export const BUILDING_COLORS: Record<BuildingType, string> = {
@@ -197,7 +198,7 @@ const ICON_COMPONENTS: Record<BuildingType, React.FC<{ color: string }>> = {
  * Renders a building icon shape directly inside an existing SVG element.
  * Used by WiringDiagram to embed icons in building rectangles.
  */
-export function BuildingIconSvg({ buildingType, x, y, size }: { buildingType: BuildingType; x: number; y: number; size: number }) {
+export const BuildingIconSvg = memo(function BuildingIconSvg({ buildingType, x, y, size }: { buildingType: BuildingType; x: number; y: number; size: number }) {
   const IconComponent = ICON_COMPONENTS[buildingType];
   if (!IconComponent) return null;
   const scale = size / 16;
@@ -206,9 +207,9 @@ export function BuildingIconSvg({ buildingType, x, y, size }: { buildingType: Bu
       <IconComponent color="rgba(255,255,255,0.85)" />
     </g>
   );
-}
+});
 
-export function BuildingIcon({ buildingType, itemId, size = 'sm', className = '' }: BuildingIconProps) {
+export const BuildingIcon = memo(function BuildingIcon({ buildingType, itemId, size = 'sm', className = '' }: BuildingIconProps) {
   const color = (buildingType === 'extractor' && itemId && EXTRACTOR_COLORS[itemId])
     ? EXTRACTOR_COLORS[itemId]
     : BUILDING_COLORS[buildingType] ?? '#6B7280';
@@ -230,4 +231,4 @@ export function BuildingIcon({ buildingType, itemId, size = 'sm', className = ''
       {IconComponent && <IconComponent color={color} />}
     </svg>
   );
-}
+});

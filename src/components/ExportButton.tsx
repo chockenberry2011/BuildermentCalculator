@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { BUILDINGS } from '../data/buildings';
 import { ITEMS } from '../data/items';
+import { useDark } from '../hooks/useDark';
 
 export function ExportButton() {
   const productionResult = useStore((s) => s.productionResult);
   const targetItemId = useStore((s) => s.targetItemId);
   const targetRate = useStore((s) => s.targetRate);
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const handleExport = () => {

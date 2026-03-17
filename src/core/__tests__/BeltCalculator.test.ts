@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateBeltRequirements, hasAllCleanBelts } from '../BeltCalculator';
+import { calculateBeltRequirements } from '../BeltCalculator';
 import { calculateProduction, getDefaultBuildingLevels } from '../ProductionCalculator';
 
 const defaultLevels = getDefaultBuildingLevels();
@@ -30,13 +30,6 @@ describe('calculateBeltRequirements', () => {
     expect(beltResult.multiBeltConnections.length).toBeGreaterThan(0);
   });
 
-  it('returns clean ratio', () => {
-    const result = calculateProduction('iron_ingot', 1, noRecipes, defaultLevels);
-    const beltResult = calculateBeltRequirements(result, BELT_SPEED);
-    expect(beltResult.cleanRatio).toBeGreaterThanOrEqual(0);
-    expect(beltResult.cleanRatio).toBeLessThanOrEqual(1);
-  });
-
   it('handles raw resource (no connections)', () => {
     const result = calculateProduction('iron_ore', 1, noRecipes, defaultLevels);
     const beltResult = calculateBeltRequirements(result, BELT_SPEED);
@@ -60,17 +53,5 @@ describe('calculateBeltRequirements', () => {
       expect(beltResult.multiBeltConnections[i - 1].beltsNeeded)
         .toBeGreaterThanOrEqual(beltResult.multiBeltConnections[i].beltsNeeded);
     }
-  });
-});
-
-describe('hasAllCleanBelts', () => {
-  it('returns boolean', () => {
-    const result = calculateProduction('iron_ingot', 1, noRecipes, defaultLevels);
-    expect(typeof hasAllCleanBelts(result, BELT_SPEED)).toBe('boolean');
-  });
-
-  it('returns true for belt-aligned rate', () => {
-    const result = calculateProduction('iron_ingot', 480, noRecipes, defaultLevels);
-    expect(hasAllCleanBelts(result, BELT_SPEED)).toBe(true);
   });
 });

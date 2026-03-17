@@ -17,12 +17,12 @@ import { CollapsibleSection } from './components/CollapsibleSection';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BadgePopover } from './components/BadgePopover';
 import { useStore } from './store/useStore';
+import { useDark } from './hooks/useDark';
 import { getItem } from './data/items';
 
 function ResetButton() {
-  const theme = useStore((s) => s.theme);
   const resetCalculator = useStore((s) => s.resetCalculator);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   return (
     <button
@@ -93,7 +93,6 @@ function StickyTargetSummary({ visible, isDark, isFullscreen, onExitFullscreen }
 
 function AppContent() {
   const viewMode = useStore((s) => s.viewMode);
-  const theme = useStore((s) => s.theme);
   const recalculate = useStore((s) => s.recalculate);
   const collapsedSections = useStore((s) => s.collapsedSections);
   const toggleSection = useStore((s) => s.toggleSection);
@@ -141,18 +140,18 @@ function AppContent() {
     return () => { document.body.style.overflow = ''; };
   }, [isFullscreen]);
 
+  const isDark = useDark();
+
   // Apply theme to document
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-  }, [theme]);
+    document.documentElement.classList.toggle('dark', isDark);
+  }, [isDark]);
 
   // Initial calculation
   useEffect(() => {
     recalculate();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const isDark = theme === 'dark';
 
   const handleEnterFullscreen = () => {
     // Auto-open the section if collapsed

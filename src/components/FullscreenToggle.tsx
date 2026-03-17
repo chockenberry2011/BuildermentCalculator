@@ -1,4 +1,4 @@
-import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 
 interface FullscreenToggleProps {
   isFullscreen: boolean;
@@ -6,8 +6,7 @@ interface FullscreenToggleProps {
 }
 
 export function FullscreenToggle({ isFullscreen, onToggle }: FullscreenToggleProps) {
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   return (
     <button

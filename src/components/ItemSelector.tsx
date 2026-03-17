@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { PRODUCIBLE_ITEMS } from '../data/items';
 import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 
 const categoryLabels: Record<string, string> = {
   intermediate: 'Intermediate',
@@ -19,8 +20,7 @@ interface ItemSelectorProps {
 export function ItemSelector({ value, onSelect }: ItemSelectorProps) {
   const storeItemId = useStore((s) => s.targetItemId);
   const storeSetTargetItem = useStore((s) => s.setTargetItem);
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   const selectedId = value ?? storeItemId;
   const handleSelect = onSelect ?? storeSetTargetItem;

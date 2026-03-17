@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useStore } from '../store/useStore';
+import { useDark } from '../hooks/useDark';
 
 interface Variable {
   name: string;
@@ -193,8 +193,7 @@ function FormulaCard({ entry, isDark }: { entry: FormulaEntry; isDark: boolean }
 }
 
 export function FormulasSection() {
-  const theme = useStore((s) => s.theme);
-  const isDark = theme === 'dark';
+  const isDark = useDark();
 
   return (
     <div className="space-y-3">
